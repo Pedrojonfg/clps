@@ -22,8 +22,6 @@ Full statement archive: [`docs/sources/challenge-statements/clps-lunar-mission-b
 | **A — Local sky at the site** | Yes | Sun/Earth elevation vs horizon; power & DTE windows |
 | **B — Full landing campaign** | Only if time + track rules allow (`decidable`) | Temperature, dust, trajectories, EDL roughness |
 
-Geometry primer (LaTeX source; compile locally): [`docs/learning/clps-horizon-geometry.tex`](docs/learning/clps-horizon-geometry.tex).
-
 ---
 
 ## Product decisions (accepted)
@@ -118,18 +116,6 @@ Domain brief (research): [`docs/research/briefs/research-brief-clps-domain.md`](
 docs/records/          decision-flow records (project, people, tasks, decisions, understanding)
 docs/sources/          archived challenge text and raw fetches
 docs/research/briefs/  research notes
-docs/learning/         geometry primer (.tex; PDF gitignored)
 ```
 
 Language: **repo English**; chat language per person (`docs/records/project.md`).
-
----
-
-## Compile the geometry primer
-
-```bash
-cd docs/learning
-pdflatex clps-horizon-geometry.tex
-```
-
-Generated PDF and LaTeX auxiliaries are **not** tracked in git.

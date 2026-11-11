@@ -35,7 +35,6 @@ Everyone defends every own decision: no (revisit when the team is formed)
 ## Sources
 
 - `docs/sources/challenge-statements/clps-lunar-mission-browser.md` — full statement (Background, Objectives, Considerations) from owner copy 2026-11-11; Resources tab empty at copy time.
-- `docs/learning/clps-horizon-geometry.tex` — TikZ visual guide for horizon/Sun/Earth geometry (compile with `pdflatex`).
 - https://www.spaceappschallenge.org/resources/participant-faqs/ — dates: summaries Sep 17, full statements Oct 28, submission guides Nov 13.
 - https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/ — official URL; paste full statement here when available (overrides mirrors).
 - https://nasaspaceapps.ae/challenges — unofficial mirror with full CLPS Lunar Mission Browser brief text (2026-11-11). Use only until official brief is archived in-repo.
