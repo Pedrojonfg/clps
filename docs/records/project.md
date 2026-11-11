@@ -34,7 +34,17 @@ Everyone defends every own decision: no (revisit when the team is formed)
 
 ## Sources
 
-- https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/ — official challenge page. NOT YET READ: the page could not be opened from the AI's environment (TLS certificate error). Once its text is pasted into the repo it wins on definitions and requirements.
+- `docs/sources/challenge-statements/clps-lunar-mission-browser.md` — full statement (Background, Objectives, Considerations) from owner copy 2026-11-11; Resources tab empty at copy time.
+- `docs/learning/clps-horizon-geometry.tex` — TikZ visual guide for horizon/Sun/Earth geometry (compile with `pdflatex`).
+- https://www.spaceappschallenge.org/resources/participant-faqs/ — dates: summaries Sep 17, full statements Oct 28, submission guides Nov 13.
+- https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/ — official URL; paste full statement here when available (overrides mirrors).
+- https://nasaspaceapps.ae/challenges — unofficial mirror with full CLPS Lunar Mission Browser brief text (2026-11-11). Use only until official brief is archived in-repo.
+- https://naif.jpl.nasa.gov/pub/naif/pds/pds4/clps/clps_spice/document/spiceds_v003.html — CLPS SPICE Data Archive documentation (kernels, missions, landing-related SPK naming).
+- https://ntrs.nasa.gov/citations/20240005553 — NASA Ames “Lunar Browser” trajectory tool (CLPS/Artemis trades; not the same as the hackathon product name alone).
+- `docs/research/briefs/research-brief-clps-domain.md` — focused domain brief (planning scales, data menu, challenge vs real landing factors) for decision-flow task T-20261111-pj-c84f.
+- https://ssd.jpl.nasa.gov/horizons/ — JPL Horizons (ephemerides; surface observer geometry).
+- https://pgda.gsfc.nasa.gov/products/69 — PGDA polar illumination / Earth visibility maps.
+- https://trek.nasa.gov/moon/ — Moon Trek (LRO-based visualization tiles).
 - https://science.nasa.gov/universe/nasa-welcomes-all-ages-experience-levels-for-space-apps-challenge/ — NASA overview of the 2026 edition (focus areas, no programming required). Does not mention CLPS.
 - https://ntrs.nasa.gov/citations/20240005553 — "Lunar Browser" NASA Ames tool abstract (2024). Probably related to the challenge name; not confirmed by the challenge text.
 - https://www.spaceappschallenge.org/resources/judging-awards-guide — judging criteria (2022 PDF definitions read; 2026 version not read).

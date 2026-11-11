@@ -1,0 +1,1 @@
+{"query": "query { challenges { slug title summary } }"}

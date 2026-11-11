@@ -1,0 +1,415 @@
+% Compile: pdflatex clps-horizon-geometry.tex (2 passes for refs)
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage{geometry}
+\geometry{margin=2.2cm}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{angles,quotes,calc,arrows.meta,decorations.pathmorphing,patterns,3d}
+\usepackage{hyperref}
+
+\title{Geometría local en un sitio lunar\\{\large CLPS Lunar Mission Browser --- guía visual}}
+\author{clps / decision-flow (draft)}
+\date{2026-11-11}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Esta nota es para equipos del reto \emph{CLPS Lunar Mission Browser}: qué significa comparar \textbf{sitio + fecha} midiendo el Sol y la Tierra respecto al \textbf{horizonte local}, por qué importa energía y comunicación DTE, y qué casos rompen la intuición (terreno, polo sur, desfases temporales).
+No sustituye Horizons/LOLA; es un mapa mental con dibujos.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%---------------------------------------------------------------------
+\section{El problema en una frase}
+%---------------------------------------------------------------------
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \node[draw,rounded corners,align=center,fill=blue!8,inner sep=8pt] (p) {%
+    \textbf{Entrada:} sitio $(\phi,\lambda)$ + instante $t$\\
+    \textbf{Salida:} ¿Sol y Tierra visibles? ¿cuánto rato? ¿métricas de potencia/com?\\
+    \textbf{Producto:} comparar muchas entradas \emph{rápido} y con claridad
+  };
+\end{tikzpicture}
+\end{center}
+
+\textbf{Capa del reto (A):} iluminación + visibilidad Tierra en el horizonte local.\\
+\textbf{Fuera del reto (B), salvo que el equipo amplíe:} polvo, rugosidad EDL, temperatura, etc.
+
+%---------------------------------------------------------------------
+\section{Observador fijo en la Luna}
+%---------------------------------------------------------------------
+El modelo mental: una persona (o antena) \textbf{quieta} en un punto. El cielo mueve; el suelo no.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.1]
+  % ground arc
+  \draw[thick,brown!60!black] (-3,0) arc (180:360:3cm);
+  \fill[brown!20] (-3,-0.05) arc (180:360:3cm) -- cycle;
+  % observer
+  \draw[fill=black] (0,0) circle (2pt);
+  \draw (-0.15,0) -- (-0.15,0.55) -- (0.15,0.55) -- (0.15,0);
+  \fill (0,0.62) circle (1.8pt);
+  % horizon line (mathematical, flat)
+  \draw[dashed,gray] (-3.2,0) -- (3.2,0);
+  \node[anchor=north] at (0,-0.35) {horizonte matemático (esfera lisa)};
+  \node[anchor=west] at (0.2,0.65) {observador};
+  % Sun
+  \draw[fill=yellow!80!orange] (2.2,1.4) circle (0.22);
+  \draw[->,orange,thick] (0,0.65) -- (2.0,1.25);
+  \node[anchor=west] at (2.5,1.4) {Sol};
+  % Earth
+  \draw[fill=blue!50] (-2.0,0.9) circle (0.18);
+  \draw[->,blue,thick] (0,0.65) -- (-1.7,0.85);
+  \node[anchor=east] at (-2.4,0.9) {Tierra};
+\end{tikzpicture}
+\caption{Vista lateral esquemática: línea de visión al Sol/Tierra desde el sitio.}
+\label{fig:observer}
+\end{figure}
+
+%---------------------------------------------------------------------
+\section{Elevación y azimut}
+%---------------------------------------------------------------------
+
+\subsection{Elevación ($h$)}
+Ángulo \textbf{sobre} (+) o \textbf{debajo} ($-$) del horizonte, a lo largo del ``arco vertical'' en esa dirección.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.15]
+  \coordinate (O) at (0,0);
+  \coordinate (H) at (2.4,0);
+  \coordinate (S) at (2.0,1.2);
+  \coordinate (B) at (1.5,-0.7);
+  \draw[thick] (-2.8,0) -- (2.8,0);
+  \node at (0,-0.35) {horizonte ($h=0$)};
+  \draw[->,thick] (O) -- (H) node[right] {azimut $A=0^\circ$ (referencia local)};
+  \draw[thick,red] (O) -- (S);
+  \pic [draw,red,angle radius=0.9cm,"$h=+30^\circ$",font=\footnotesize] {angle=H--O--S};
+  \draw[dotted,red] (S) -- (2.0,0);
+  \draw[thick,gray] (O) -- (B);
+  \pic [draw,gray,angle radius=0.7cm,"$h=-20^\circ$",font=\footnotesize] {angle=B--O--H};
+  \node[align=left,text width=2.6cm,anchor=west] at (-2.7,1.6) {%
+    $h>0$: sobre horizonte (visible directo)\\
+    $h=0$: en el horizonte\\
+    $h<0$: oculto bajo horizonte
+  };
+\end{tikzpicture}
+\caption{Elevación del cuerpo celeste.}
+\end{figure}
+
+\subsection{Azimut ($A$) --- el Sol \emph{no} vive en el plano del horizonte}
+
+El Sol y la Tierra están \textbf{en el cielo} (arriba). El azimut no es ``dónde está el Sol en el suelo''. Es la \textbf{dirección de la brújula} hacia la que miras si bajas la mirada siguiendo la vertical hasta el horizonte: la \textbf{proyección} de la línea de visión sobre el plano horizontal.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.05]
+  % ground plane (parallelogram in isometric-ish view)
+  \fill[brown!12] (-3.2,-0.3) -- (2.8,-0.3) -- (3.8,1.0) -- (-2.2,1.0) -- cycle;
+  \draw[thick,brown!50!black] (-3.2,-0.3) -- (2.8,-0.3) -- (3.8,1.0) -- (-2.2,1.0) -- cycle;
+  \node[font=\scriptsize,brown!60!black] at (0.5,0.35) {plano del horizonte (suelo local)};
+  % observer
+  \coordinate (O) at (0.2,0.2);
+  \fill (O) circle (2.2pt);
+  \node[below] at (0.2,-0.15) {tú};
+  % reference north in plane
+  \draw[->,thick] (O) -- (2.0,0.2) node[right,font=\scriptsize] {$A=0^\circ$ (referencia)};
+  % projection point P on ground (shadow of sun direction)
+  \coordinate (P) at (1.4,0.85);
+  \fill[orange] (P) circle (1.5pt);
+  \draw[orange,dashed,thick] (O) -- (P);
+  \node[orange,font=\scriptsize,above] at (P) {proyección (``sombra'' de la dirección)};
+  % sun in sky
+  \coordinate (S) at (1.4,2.6);
+  \draw[fill=yellow!80!orange] (S) circle (0.28);
+  \node[right,font=\scriptsize] at (1.75,2.7) {Sol (en el cielo)};
+  % true line of sight
+  \draw[->,orange,very thick] (O) -- (S);
+  \node[orange,font=\scriptsize,left] at (0.55,1.5) {línea de visión};
+  % vertical drop from S to P
+  \draw[dotted,gray] (S) -- (P);
+  \node[gray,font=\scriptsize,right] at (1.55,1.7) {``caer'' al suelo};
+  % elevation angle mark
+  \draw[red] (O) -- ++(1.1,0);
+  \node[red,font=\scriptsize] at (0.9,0.55) {$h$};
+  % azimuth arc in plane
+  \draw[blue,thick] (0.9,0.2) arc (0:35:0.7);
+  \node[blue,font=\scriptsize] at (1.15,0.55) {$A$};
+\end{tikzpicture}
+\caption{El Sol está fuera del plano. Elevación $h$ = altura angular. Azimut $A$ = brújula hacia la proyección en el suelo.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % top-down: only projections
+  \draw[thick,fill=brown!8] (0,0) circle (2.2);
+  \fill (0,0) circle (2pt);
+  \node[below] at (0,-0.15) {tú (vista desde arriba)};
+  \draw[->,thick] (0,0) -- (2.2,0) node[right,font=\scriptsize] {$A=0^\circ$};
+  \draw[->,thick,orange] (0,0) -- (50:2.2);
+  \node[orange,font=\scriptsize] at (50:2.55) {proyección del Sol};
+  \draw[->,thick,blue] (0,0) -- (140:2.2);
+  \node[blue,font=\scriptsize] at (140:2.55) {proyección de la Tierra};
+  \draw[orange,thick] (0.6,0) arc (0:50:0.6);
+  \node[orange,font=\scriptsize] at (25:0.95) {$A_\odot$};
+  \draw[blue,thick] (0.45,0) arc (0:140:0.45);
+  \node[blue,font=\scriptsize] at (90:0.7) {$A_\oplus$};
+  \node[align=center,font=\scriptsize] at (0,-2.9) {%
+    Vista cenital: solo ves \emph{direcciones} en el suelo.\\
+    La altura ($h$) se perdió: por eso hace falta la elevación aparte.
+  };
+\end{tikzpicture}
+\caption{Azimut = brújula. Sol y Tierra no están ``en'' este círculo; solo sus direcciones proyectadas.}
+\end{figure}
+
+Analogía: señalas un avión. La \textbf{elevación} es cuánto levantas el brazo; el \textbf{azimut} es hacia qué punto del horizonte apuntarías si el avión cayera en vertical hasta la línea del paisaje.
+
+%---------------------------------------------------------------------
+\section{Dos métricas que el reto destaca}
+%---------------------------------------------------------------------
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  \begin{scope}[xshift=-3.8cm]
+    \draw[fill=yellow!15,rounded corners] (-1.6,-1.4) rectangle (1.6,1.6);
+    \node[align=center] at (0,1.2) {\textbf{Sol}};
+    \draw[thick] (-1.2,0) -- (1.2,0);
+    \draw[orange,thick] (0,0) -- (0.9,0.7);
+    \node[align=center] at (0,-0.9) { $h_\odot > 0$ $\Rightarrow$ luz solar\\paneles / térmica};
+  \end{scope}
+  \begin{scope}[xshift=3.8cm]
+    \draw[fill=blue!10,rounded corners] (-1.6,-1.4) rectangle (1.6,1.6);
+    \node[align=center] at (0,1.2) {\textbf{Tierra}};
+    \draw[thick] (-1.2,0) -- (1.2,0);
+    \draw[blue,thick] (0,0) -- (-0.8,0.5);
+    \node[align=center] at (0,-0.9) { $h_\oplus > 0$ $\Rightarrow$ DTE\\(sin relevo)};
+  \end{scope}
+  \node at (0,0) {\Huge $\&$};
+  \node[align=center] at (0,-2.3) {Para operar con energía \emph{y} telemetría directa,\\a menudo se necesitan \textbf{ambos} en la misma ventana (misión real).};
+\end{tikzpicture}
+\caption{Energía vs comunicación: preguntas distintas, acopladas en el tiempo.}
+\end{figure}
+
+\subsection{Relevo (relay) vs DTE}
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=0.95,font=\small]
+  % DTE
+  \begin{scope}[xshift=0cm]
+    \draw[fill=brown!25] (0,0) circle (0.35);
+    \node at (0,-0.55) {Luna};
+    \draw[fill=green!25] (4.2,0.8) circle (0.4);
+    \node at (4.2,0.25) {Tierra};
+    \draw[->,thick,blue] (0.4,0.15) -- (3.7,0.7);
+    \node[blue] at (2.1,1.15) {DTE: línea de vista};
+  \end{scope}
+  % Relay
+  \begin{scope}[yshift=-2.8cm]
+    \draw[fill=brown!25] (0,0) circle (0.35);
+    \node at (0,-0.55) {Luna};
+    \draw[fill=gray!40] (1.8,1.4) circle (0.22);
+    \node at (1.8,1.85) {satélite};
+    \draw[fill=green!25] (4.2,0.3) circle (0.4);
+    \node at (4.2,-0.25) {Tierra};
+    \draw[->,thick] (0.3,0.25) -- (1.55,1.2);
+    \draw[->,thick] (2.05,1.25) -- (3.7,0.5);
+    \node[align=center] at (2.1,-0.9) {Relevo: la Tierra no está a la vista;\\otro satélite reenvía la radio};
+  \end{scope}
+\end{tikzpicture}
+\caption{Sin relevo, necesitas Tierra sobre el horizonte local. Con relevo, DTE deja de ser el cuello de botella (otro sistema, más caro/complejo).}
+\end{figure}
+
+\subsection{Casuística A: solo Sol}
+\begin{center}
+\begin{tikzpicture}
+  \node[draw,fill=orange!20,align=center,inner sep=6pt] {Sol $+15^\circ$, Tierra $-3^\circ$\\$\Rightarrow$ posible energía, \textbf{sin} DTE en ese instante};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Casuística B: solo Tierra}
+\begin{center}
+\begin{tikzpicture}
+  \node[draw,fill=blue!15,align=center,inner sep=6pt] {Tierra $+10^\circ$, Sol $-5^\circ$\\$\Rightarrow$ quizá radio, \textbf{sin} luz solar directa};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Casuística C: ambos}
+\begin{center}
+\begin{tikzpicture}
+  \node[draw,fill=green!15,align=center,inner sep=6pt] {Sol y Tierra $>0$\\ventana operativa ``dulce'' (simplificado)};
+\end{tikzpicture}
+\end{center}
+
+%---------------------------------------------------------------------
+\section{Comparar sitios y fechas (núcleo del producto)}
+%---------------------------------------------------------------------
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=0.95,font=\footnotesize]
+  \node[draw,rounded corners,align=center,minimum width=3.2cm,minimum height=1.1cm] (s1) at (0,0) {Sitio A\\$(\phi_1,\lambda_1)$};
+  \node[draw,rounded corners,align=center,minimum width=3.2cm,minimum height=1.1cm] (s2) at (5,0) {Sitio B\\$(\phi_2,\lambda_2)$};
+  \node[draw,rounded corners,minimum width=3.2cm,minimum height=1.1cm] (t) at (2.5,1.8) {Fecha/hora $t$};
+  \draw[->] (t) -- (s1);
+  \draw[->] (t) -- (s2);
+  \node[draw,fill=gray!10,align=center,minimum width=7cm] (m) at (2.5,-1.6) {Métricas: horas Sol$>0$, horas Tierra$>0$,\\$h$ máximo, tiempo hasta ocaso/Tierra oculta, \ldots};
+  \draw[->] (s1) -- (m);
+  \draw[->] (s2) -- (m);
+  \node at (2.5,-2.6) {El mismo $t$ puede ser bueno en A y malo en B (polo sur).};
+\end{tikzpicture}
+\caption{Comparación lado a lado.}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=0.9,font=\footnotesize]
+  \draw[->] (0,0) -- (10,0) node[right] {tiempo UTC};
+  \draw[->] (0,0) -- (0,3) node[above] {$h$ (grados)};
+  \draw[thick,orange] plot [smooth] coordinates {(0,-1) (1,0.5) (2.5,2) (4,1) (5.5,-0.5) (7,-1.5) (9,-1)};
+  \node[orange] at (8,1.2) {$h_\odot$};
+  \draw[thick,blue] plot [smooth] coordinates {(0,-0.5) (2,1) (3.5,1.5) (5,0.8) (6.5,-0.2) (8,-1) (9.5,-1.2)};
+  \node[blue] at (6.5,2) {$h_\oplus$};
+  \draw[dashed] (0,0) -- (10,0);
+  \fill[green!20,opacity=0.5] (2,0) rectangle (4.2,3);
+  \node[align=center] at (3.1,2.6) {ventana\\ambos $>0$};
+\end{tikzpicture}
+\caption{Series temporales: un sitio fijo, evolución de elevaciones (esquemático).}
+\end{figure}
+
+%---------------------------------------------------------------------
+\section{Horizonte real: el terreno importa}
+%---------------------------------------------------------------------
+Sin atmósfera lunar, el horizonte lo marcan \textbf{relieve local} + curvatura. Un borde de cráter puede tapar la Tierra aunque la geometría esférica diga que debería verse.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % crater profile
+  \draw[thick,brown!60!black] plot [smooth] coordinates {(-3,0) (-1.5,0.3) (0,0) (1.2,0.8) (2.5,1.4) (4,0.2) (5,0)};
+  \fill[brown!15] plot [smooth] coordinates {(-3,0) (-1.5,0.3) (0,0) (1.2,0.8) (2.5,1.4) (4,0.2) (5,0)} -- (5,-0.2) -- (-3,-0.2) -- cycle;
+  \coordinate (obs) at (0,0);
+  \fill (obs) circle (2pt);
+  \draw[dashed,gray] (-3,0) -- (3.5,0);
+  \node at (1.8,0.15) [font=\scriptsize] {horizonte plano (error)};
+  % rim blocks earth
+  \draw[blue,thick] (obs) -- (4.5,2.2);
+  \draw[blue,thick] (2.5,1.4) -- (2.7,1.55);
+  \node[blue,align=center] at (5.2,2.0) {Tierra\\bloqueada\\por cima};
+  \draw[orange,thick] (obs) -- (-2.2,1.6);
+  \node[orange] at (-2.8,1.8) {Sol OK};
+\end{tikzpicture}
+\caption{Mismo instante: Sol visible, Tierra oculta por relieve (caso típico en polo).}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=0.85]
+  \node[align=left] at (0,2.8) {\textbf{Mover el lander 200\,m} puede cambiar qué cumbre tapa el horizonte $\Rightarrow$ cambia $h$ efectivo.};
+  \draw[->,thick] (0,2.2) -- (0,1.6);
+  \draw[thick] plot [smooth] coordinates {(-4,0) (-2,1.2) (0,0.2) (2,1.5) (4,0)};
+  \fill (-0.3,0.35) circle (2pt) node[above] {A};
+  \fill (1.0,0.5) circle (2pt) node[above] {B};
+  \draw[red,thick,dashed] (1.0,0.5) -- (3.8,2.5);
+  \node[red,font=\scriptsize] at (3.5,2.2) {nuevo bloqueo};
+\end{tikzpicture}
+\caption{Por qué ``pocos metros'' pueden importar cerca de pendientes pronunciadas.}
+\end{figure}
+
+%---------------------------------------------------------------------
+\section{Polo sur: sombras largas y días raros}
+%---------------------------------------------------------------------
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % polar schematic
+  \draw (0,0) circle (2);
+  \fill[pattern=north east lines,pattern color=gray!40] (0,0) -- (90:2) arc (90:270:2) -- cycle;
+  \node[align=center] at (-1.2,0) {\scriptsize sombra\\persistente};
+  \draw[orange,thick] (0,-2.3) -- (0,-1.2);
+  \node[orange] at (0,-2.6) {Sol bajo en cielo (polo)};
+  \node[align=center] at (0,-3.5) {Iluminación y visibilidad de Tierra varían fuerte\\en ciclos de días/semanas --- no ``cada 24\,h'' terrestre.};
+\end{tikzpicture}
+\caption{Intuición: geometría polar $\neq$ ecuador lunar.}
+\end{figure}
+
+%---------------------------------------------------------------------
+\section{Qué \emph{no} es este reto (lanzamiento desde Tierra)}
+%---------------------------------------------------------------------
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[scale=0.9,font=\small]
+  \draw[fill=blue!8] (-0.3,-0.3) rectangle (10.3,3.3);
+  \node at (5,2.8) {\textbf{Reto (capa A)}: cielo \emph{en el sitio lunar}};
+  \draw[fill=brown!30] (4.5,0) circle (0.5);
+  \node at (4.5,-0.6) {Luna};
+  \draw[fill=green!20] (0,0.8) circle (0.35);
+  \node[left] at (0,0.8) {Tierra (planeta)};
+  \draw[orange,thick] (4.5,0.2) -- (3.5,1.5);
+  \node[orange] at (3.2,1.7) {Sol en cielo local};
+\end{tikzpicture}
+
+\vspace{0.8em}
+
+\begin{tikzpicture}[scale=0.9,font=\small]
+  \draw[fill=red!8] (-0.3,-0.3) rectangle (10.3,3.3);
+  \node at (5,2.8) {\textbf{Otro problema (trayectoria)}: pad $\rightarrow$ transferencia $\rightarrow$ alunizaje};
+  \draw[fill=green!20] (0,0.5) circle (0.4);
+  \draw[fill=brown!30] (9,0.5) circle (0.35);
+  \draw[->,thick,dashed] (0.5,0.5) .. controls (4,2.2) .. (8.5,0.8);
+  \node at (5,0.2) {ventanas de lanzamiento, $\Delta v$, etc. (Lunar Browser Ames)};
+\end{tikzpicture}
+\caption{Evitar mezclar ``orientación del cohete en Cabo Cañaveral'' con ``Sol/Tierra en el cráter elegido''.}
+\end{figure}
+
+%---------------------------------------------------------------------
+\section{Herramientas del statement}
+%---------------------------------------------------------------------
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Herramienta & Rol en el prototipo \\
+\midrule
+JPL Horizons & $h$, $A$ vs tiempo para un punto \\
+Moon Trek / Quickmap & mapas y contexto visual \\
+LOLA / PGDA & relieve, horizonte físico, sombras \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%---------------------------------------------------------------------
+\section{Validación (niveles)}
+%---------------------------------------------------------------------
+\begin{enumerate}
+  \item \textbf{Nivel 0:} un instante, comparar signo de $h_\odot$, $h_\oplus$ con intuición.
+  \item \textbf{Nivel 1:} cruzar Horizons con un mapa Trek para el mismo sitio.
+  \item \textbf{Nivel 2:} incluir relieve (horizonte no plano) en un caso publicado.
+\end{enumerate}
+
+%---------------------------------------------------------------------
+\section{Checklist antes de diseñar el ``motor de recomendación''}
+%---------------------------------------------------------------------
+\begin{itemize}
+  \item ¿Catálogo de sitios o coordenadas libres?
+  \item ¿Resolución temporal (hora, día, ventana de misión de cuántos días)?
+  \item ¿Métrica objetivo (maximizar horas ``dulces'', penalizar sombra, etc.)?
+  \item ¿Horizonte esférico primero y DEM después, o al revés?
+  \item ¿Qué prometes en el vídeo de entrega (planner vs educativo)?
+\end{itemize}
+
+\vfill
+\hrule
+\small
+Referencias: NASA Space Apps statement CLPS Lunar Mission Browser (2026), archivado en \texttt{docs/sources/challenge-statements/}.
+Compilar este PDF y repasar con el equipo antes de decisiones de producto.
+
+\end{document}

@@ -1,0 +1,14 @@
+# LaTeX build products (keep .tex)
+docs/learning/*.pdf
+docs/learning/*.aux
+docs/learning/*.log
+docs/learning/*.toc
+docs/learning/*.out
+docs/learning/*.synctex.gz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
