@@ -1,4 +1,4 @@
-"""Needs-adapted score (P4). # D-7520 D-6ce5 D-7af3 D-9e53 D-5cfa"""
+"""Needs-adapted score (P4). # D-7520 D-6ce5 D-7af3 D-9e53 D-5cfa D-5577 D-f57e"""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import math
 
 FORMULA = "product_phi_slack_bonus_capped"
 
-_SIGMA_NIGHT = 5.0
-_SIGMA_LIT = 5.0
-_SIGMA_NO_EARTH = 1.0
-_BETA = 0.15
-_MAX_UPLIFT = 0.30
+_SIGMA_NIGHT = 5.0  # per D-7520
+_SIGMA_LIT = 5.0  # per D-7520
+_SIGMA_NO_EARTH = 1.0  # per D-7520
+_BETA = 0.15  # per D-6ce5
+_MAX_UPLIFT = 0.30  # per D-6ce5
 
 
 def _phi(z: float) -> float:
@@ -21,12 +21,30 @@ def _clip01(x: float) -> float:
     return min(1.0, max(0.0, x))
 
 
+def _hazard_field(hazards: dict, key: str):
+    if not hazards:
+        return None
+    if hazards.get(key) is not None:
+        return hazards[key]
+    agg = hazards.get("aggregate") or {}
+    return agg.get(key)
+
+
+def _hazard_gap_star(hazards: dict, needs: dict) -> bool:
+    # per D-f57e: star only when requirement set but hazard value absent (temperature/dust).
+    if needs.get("max_temperature_k") is not None and _hazard_field(hazards, "temperature_k") is None:
+        return True
+    if needs.get("min_soil_resistance") is not None and _hazard_field(hazards, "soil_resistance") is None:
+        return True
+    return False
+
+
 def _surface_layer0(hazards: dict, needs: dict) -> list[str]:
     failing: list[str] = []
     max_temp = needs.get("max_temperature_k")
     min_res = needs.get("min_soil_resistance")
-    temp_k = hazards.get("temperature_k")
-    res = hazards.get("soil_resistance")
+    temp_k = _hazard_field(hazards, "temperature_k")
+    res = _hazard_field(hazards, "soil_resistance")
     if max_temp is not None and temp_k is not None and temp_k > float(max_temp):
         failing.append("temperature")
     if min_res is not None and res is not None and res < float(min_res):
@@ -34,7 +52,8 @@ def _surface_layer0(hazards: dict, needs: dict) -> list[str]:
     return failing
 
 
-def score(series: dict, hazards: dict, needs: dict) -> dict:
+def _schedule_layer0(series: dict, needs: dict) -> list[str]:
+    failing: list[str] = []
     night = int(series["longest_night_h"])
     no_earth = int(series["longest_no_earth_h"])
     max_night = int(needs["max_night_h"])
@@ -42,7 +61,6 @@ def score(series: dict, hazards: dict, needs: dict) -> dict:
     min_lit = int(needs.get("min_continuous_lit_h", 0))
     longest_lit = int(series.get("longest_lit_h", 0))
     require_both = bool(needs.get("require_both", False))
-    failing: list[str] = []
     if night > max_night:
         failing.append("night")
     if no_earth > max_no_earth:
@@ -51,20 +69,17 @@ def score(series: dict, hazards: dict, needs: dict) -> dict:
         failing.append("both")
     if min_lit > 0 and longest_lit < min_lit:
         failing.append("lit")
-    hz = hazards.get("aggregate", hazards) if hazards else {}
-    failing.extend(_surface_layer0(hz, needs))
-    provenance = {
-        "score_formula": FORMULA,
-        "schedule_version": series.get("schedule_version", "n/a"),
-        "decisions": ["D-7520", "D-6ce5", "D-7af3", "D-9e53", "D-5cfa"],
-        "sigmas_h": {
-            "night": _SIGMA_NIGHT,
-            "lit": _SIGMA_LIT,
-            "no_earth": _SIGMA_NO_EARTH,
-        },
-    }
-    if failing:
-        return {"score": 0, "feasible": False, "breakdown": {"failing": failing}, "provenance": provenance}
+    return failing
+
+
+def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
+    """R, B, capped R*(1+βB) — computed even when layer-0 slacks are negative. # D-5577"""
+    max_night = int(needs["max_night_h"])
+    max_no_earth = int(needs["max_no_earth_h"])
+    min_lit = int(needs.get("min_continuous_lit_h", 0))
+    night = int(series["longest_night_h"])
+    no_earth = int(series["longest_no_earth_h"])
+    longest_lit = int(series.get("longest_lit_h", 0))
 
     slack_night = max_night - night
     slack_no_earth = max_no_earth - no_earth
@@ -95,16 +110,51 @@ def score(series: dict, hazards: dict, needs: dict) -> dict:
         final = r * (1.0 + _MAX_UPLIFT)
     else:
         final = raw
+    return r, b, float(final)
+
+
+def score(series: dict, hazards: dict, needs: dict) -> dict:
+    failing = _schedule_layer0(series, needs)
+    failing.extend(_surface_layer0(hazards, needs))
+    r, b, companion = _layer1_score(series, needs)
+    gap_star = _hazard_gap_star(hazards, needs)
+
+    provenance = {
+        "score_formula": FORMULA,
+        "schedule_version": series.get("schedule_version", "n/a"),
+        "decisions": ["D-7520", "D-6ce5", "D-7af3", "D-9e53", "D-5cfa", "D-5577", "D-f57e"],
+        "sigmas_h": {
+            "night": _SIGMA_NIGHT,
+            "lit": _SIGMA_LIT,
+            "no_earth": _SIGMA_NO_EARTH,
+        },
+    }
+
+    base: dict = {
+        "companion_score": companion,
+        "provenance": provenance,
+    }
+    if gap_star:
+        base["hazard_gap_star"] = True
+
+    if failing:
+        return {
+            **base,
+            "score": 0,
+            "feasible": False,
+            "breakdown": {"failing": failing, "layer1_R": r, "layer1_B": b},
+        }
+
     layer2 = 0.0
     return {
-        "score": float(final),
+        **base,
+        "score": companion,
         "feasible": True,
         "breakdown": {
             "layer1_R": r,
             "layer1_B": b,
-            "layer1": final,
+            "layer1": companion,
             "layer2": layer2,
             "failing": [],
         },
-        "provenance": provenance,
     }

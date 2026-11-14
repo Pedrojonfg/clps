@@ -124,6 +124,7 @@ def site(
     earth_lit_percent: float = Query(0, ge=0, le=100),
     bridge_h: int = Query(5, ge=0, le=48),
     hazards_enabled: bool = Query(True),
+    local_search: int = Query(0, description="1 = include local_search block"),
 ) -> dict:
     # per D-20261114-pj-8588: mock only when mock=1
     if mock == 1:
@@ -171,6 +172,7 @@ def site(
             earth_lit_percent=earth_pct,
             bridge_h=bridge,
             hazards_enabled=hazards_enabled,
+            local_search=local_search == 1,
         )
     except FileNotFoundError as e:
         raise HTTPException(
