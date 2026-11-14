@@ -58,7 +58,6 @@ Keep the full portfolio ambition instead of a cut-down weekend bet, accept a fix
 | team | owner_only | Builder is pj alone; friends join for the pitch |
 | space_apps_submission_deadline | 2026-11-15 23:59 local | Video ≤ 30 s or ≤ 7 slides; SI use disclosed |
 | project_window_end | 2026-11-20 | Work continues after the submission |
-| hack_submission_cut | deferred — defined in the `/shape-up` replan on top of this task's decisions | |
 | hackathon_lite_plan | rejected | `docs/plans/2026-11-14-hackathon-lite-plan.md` is not adopted |
 
 ## Expected behavior and validation
@@ -70,4 +69,4 @@ Keep the full portfolio ambition instead of a cut-down weekend bet, accept a fix
 - `project.md` must move "rules & eligibility (Space Apps)" from `out` into scope (submission format, SI disclosure, NASA-branding limits) and add milestones 2026-11-15 (submission) and 2026-11-20 (project end). Edit on the default branch or as its own small PR, not from this feature branch.
 - `primary_body_v1 = moon` from `D-7e2a` is not restated; `primary_body = moon` in `D-20261114-pj-b8d3` covers it.
 - Data and visualization decisions in `T-20261114-pj-12b7` are taken for the full portfolio scope; the hack cut is chosen afterwards.
-- The weekend plan is redone with `/shape-up`.
+- The weekend plan is redone with `/shape-up`; the submission cut is set in `D-20261114-pj-a3b3`.

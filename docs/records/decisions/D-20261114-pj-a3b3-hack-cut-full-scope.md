@@ -41,7 +41,7 @@ ai: options+critique
 
 | Name | Value | Notes |
 |------|-------|-------|
-| hack_submission_cut | full_portfolio_scope | Fills the deferred value in `D-20261114-pj-d7d9` |
+| hack_submission_cut | full_portfolio_scope | Submission cut left open by `D-20261114-pj-d7d9` |
 | hack_fallback_cut | plan cut order at failed checkpoints and the Sun 18:00 freeze | `docs/plans/2026-11-14-implementation-plan.md` §12 |
 
 ## Expected behavior and validation
