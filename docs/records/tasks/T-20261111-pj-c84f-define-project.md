@@ -21,11 +21,12 @@ Done means: the owner understands the problem and the available data well enough
 
 ## Pending checkpoint
 
-None. Product ledger closed 2026-11-11 (owner): claims/team deferred; engine → future ledger.
+None. Product ledger closed 2026-11-11; **reopened and closed again** 2026-11-14 for solo portfolio (`T-20261114-pj-a1b2`). Engine ledger still future.
 
 ## Decisions
 
-Product ledger closed. Accepted: D-20261111-pj-ea51, D-20261111-pj-60ab, D-20261111-pj-5cf6. Deferred to later: claims, team; engine ledger (metrics, recommender, data/horizon, technical validation).
+Original accept: D-20261111-pj-ea51, D-20261111-pj-60ab, D-20261111-pj-5cf6.  
+After `T-20261114-pj-a1b2`: `D-60ab` kept; `D-ea51` and `D-5cf6` superseded by `D-3c91` and `D-9f04`; added `D-7e2a`, `D-b8d3`.
 
 ## Orientation
 

@@ -4,13 +4,14 @@ title: "Audience and product positioning"
 date: 2026-11-11T15:08:17Z
 author: pj
 decided-by: pj
-status: accepted
+status: superseded
+superseded-by: D-20261114-pj-3c91
 mode: own
 domain: problem framing
 task: T-20261111-pj-c84f
 concepts: [framing, challenge brief]
 supersedes: []
-relates: [U-20261111-pj-9197]
+relates: [U-20261111-pj-9197, D-20261114-pj-3c91]
 ai: options+critique
 ---
 # Audience and product positioning
