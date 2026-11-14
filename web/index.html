@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Horizon planner — mock V0</title>
+    <title>Horizon planner — Site01</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -83,9 +83,59 @@
         margin: 0 auto;
       }
 
+      .planner {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+        gap: 0.65rem 1rem;
+        margin-bottom: 1rem;
+        padding: 0.85rem;
+        background: var(--anorthosite);
+        border: 1px solid var(--ring);
+        font-size: 0.85rem;
+      }
+
+      .planner label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        color: var(--ink-quiet);
+      }
+
+      .planner input,
+      .planner select {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.78rem;
+        padding: 0.35rem 0.4rem;
+        border: 1px solid var(--ring);
+        background: var(--anorthosite-mid);
+        color: var(--ink);
+      }
+
+      .planner-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: flex-end;
+        grid-column: 1 / -1;
+      }
+
+      .planner button {
+        font-family: inherit;
+        font-size: 0.82rem;
+        padding: 0.4rem 0.75rem;
+        border: 1px solid var(--ring);
+        background: var(--anorthosite-mid);
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .planner button.primary {
+        border-color: var(--gold-dim);
+        color: var(--gold-graze);
+      }
+
       .case-strip {
         display: grid;
-        grid-template-columns: repeat(24, 1fr);
         gap: 2px;
         margin: 0.75rem auto 0;
         max-width: 440px;
@@ -205,13 +255,37 @@
   <body>
     <main>
       <header>
-        <p class="tag-mock">Mock · V0</p>
+        <p class="tag-mock" id="data-tag">Loading…</p>
         <h1>South-polar horizon operate mode</h1>
-        <p class="lede">
+        <p class="lede" id="lede">
           Polar sky chart for site survey plate review. Azimuth clockwise from north at top;
-          elevation outward. Tracks and mask are illustrative mock data only.
+          elevation outward.
         </p>
       </header>
+
+      <form class="planner" id="planner-form">
+        <label>Latitude ° <input name="lat" type="number" step="any" value="-89.46316" required /></label>
+        <label>Longitude ° (0–360) <input name="lon" type="number" step="any" value="222.51045" required /></label>
+        <label>Start (UTC) <input name="start" type="datetime-local" value="2027-01-01T00:00" required /></label>
+        <label>End (UTC) <input name="end" type="datetime-local" value="2027-01-01T23:00" required /></label>
+        <label>Step (h) <input name="step_h" type="number" min="1" max="24" value="1" /></label>
+        <label>Mission template
+          <select name="template_id" id="template-select">
+            <option value="">Custom</option>
+          </select>
+        </label>
+        <label>Max night (h) <input name="max_night_h" type="number" value="72" /></label>
+        <label>Max no-Earth (h) <input name="max_no_earth_h" type="number" value="48" /></label>
+        <label>Sun lit % <input name="sun_lit_percent" type="number" min="0" max="100" value="0" /></label>
+        <label>Earth lit % <input name="earth_lit_percent" type="number" min="0" max="100" value="0" /></label>
+        <label>Shadow bridge (h) <input name="bridge_h" type="number" min="0" max="48" value="5" /></label>
+        <label><input name="require_both" type="checkbox" /> Require Sun and Earth together</label>
+        <label><input name="hazards_enabled" type="checkbox" checked /> Layer-B hazards in score</label>
+        <div class="planner-actions">
+          <button type="submit" class="primary">Run planner</button>
+          <button type="button" id="demo-site-btn">Demo site (PGDA Site01)</button>
+        </div>
+      </form>
 
       <section class="chart-panel" aria-labelledby="chart-heading">
         <h2 id="chart-heading" class="visually-hidden" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">
@@ -244,9 +318,8 @@
         </div>
       </section>
 
-      <footer>
-        lunar-eval horizon planner mock V0 — not affiliated with or endorsed by NASA.
-        Coordinates and series are hardcoded for CI; no SPICE or DEM queries.
+      <footer id="page-footer">
+        lunar-eval horizon planner — not affiliated with or endorsed by NASA.
       </footer>
     </main>
 
@@ -349,9 +422,12 @@
 
         const strip = document.getElementById("case-strip");
         strip.innerHTML = "";
+        strip.style.gridTemplateColumns = `repeat(${data.sky.length}, 1fr)`;
+        const sunThr = data.needs?.sun_lit_threshold ?? 0;
+        const earthThr = data.needs?.earth_lit_threshold ?? 0;
         data.sky.forEach((s, i) => {
-          const sf = data.series.sun_fraction[i] > 0.5;
-          const ef = data.series.earth_fraction[i] > 0.5;
+          const sf = data.series.sun_fraction[i] > sunThr;
+          const ef = data.series.earth_fraction[i] > earthThr;
           let cls = "case-neither";
           if (sf && ef) cls = "case-both";
           else if (sf) cls = "case-sun";
@@ -370,6 +446,10 @@
         document.getElementById("needs-dl").innerHTML = `
           <dt>Max continuous night</dt><dd>${needs.max_night_h} h</dd>
           <dt>Max gap without Earth</dt><dd>${needs.max_no_earth_h} h</dd>
+          <dt>Sun lit threshold</dt><dd>${needs.sun_lit_percent ?? (sunThr * 100)}%</dd>
+          <dt>Earth lit threshold</dt><dd>${needs.earth_lit_percent ?? (earthThr * 100)}%</dd>
+          <dt>Shadow bridge</dt><dd>${needs.bridge_h ?? "—"} h</dt>
+          <dt>Hazards</dt><dd>${data.hazards_enabled ? "on" : "off"}</dd>
         `;
 
         const sc = data.score;
@@ -389,18 +469,103 @@
           `Formula: ${prov.score_formula} · schedule ${prov.schedule_version}`;
       }
 
-      async function init() {
+      function toUtcIso(localValue) {
+        if (!localValue) return "";
+        return localValue + ":00Z";
+      }
+
+      function buildQuery(form) {
+        const p = new URLSearchParams();
+        p.set("lat", form.lat.value);
+        p.set("lon", form.lon.value);
+        p.set("start", toUtcIso(form.start.value));
+        p.set("end", toUtcIso(form.end.value));
+        p.set("step_h", form.step_h.value);
+        if (form.template_id.value) p.set("template_id", form.template_id.value);
+        else {
+          p.set("max_night_h", form.max_night_h.value);
+          p.set("max_no_earth_h", form.max_no_earth_h.value);
+          p.set("require_both", form.require_both.checked ? "true" : "false");
+          p.set("sun_lit_percent", form.sun_lit_percent.value);
+          p.set("earth_lit_percent", form.earth_lit_percent.value);
+          p.set("bridge_h", form.bridge_h.value);
+        }
+        p.set("hazards_enabled", form.hazards_enabled.checked ? "true" : "false");
+        return p.toString();
+      }
+
+      function applyTemplate(form, tpl) {
+        form.max_night_h.value = tpl.max_night_h;
+        form.max_no_earth_h.value = tpl.max_no_earth_h;
+        form.sun_lit_percent.value = tpl.sun_lit_percent;
+        form.earth_lit_percent.value = tpl.earth_lit_percent;
+        form.bridge_h.value = tpl.bridge_h;
+        form.require_both.checked = tpl.require_both;
+      }
+
+      async function loadTemplates(form) {
+        const sel = document.getElementById("template-select");
+        const res = await fetch("/mission-templates");
+        const body = await res.json();
+        for (const tpl of body.templates) {
+          const opt = document.createElement("option");
+          opt.value = tpl.id;
+          opt.textContent = tpl.label;
+          opt.title = tpl.description;
+          sel.appendChild(opt);
+        }
+        sel.addEventListener("change", () => {
+          const id = sel.value;
+          if (!id) return;
+          const tpl = body.templates.find((t) => t.id === id);
+          if (tpl) applyTemplate(form, tpl);
+        });
+      }
+
+      async function runPlanner(form) {
         const status = document.getElementById("load-status");
+        status.className = "";
+        status.textContent = "Computing…";
         try {
-          const res = await fetch("/site");
-          if (!res.ok) throw new Error(res.statusText);
-          const data = await res.json();
+          const res = await fetch("/site?" + buildQuery(form));
+          const body = await res.json();
+          if (!res.ok) {
+            const msg = body.detail?.message || body.detail?.error || res.statusText;
+            throw new Error(msg);
+          }
           status.textContent = "";
-          drawPolarChart(data);
+          const tag = document.getElementById("data-tag");
+          const lede = document.getElementById("lede");
+          const foot = document.getElementById("page-footer");
+          if (body.data_source === "real") {
+            tag.textContent = "Live · kernels + cached mask";
+            tag.style.color = "var(--gold-graze)";
+            lede.textContent =
+              "Polar sky chart: azimuth from north at top. Mask on disk; Sun/Earth computed on request.";
+            foot.textContent =
+              "Provenance: SpiceyPy, DE440, PGDA LOLA DEMs. Not affiliated with or endorsed by NASA.";
+          } else {
+            tag.textContent = "Mock";
+          }
+          drawPolarChart(body);
         } catch (e) {
           status.className = "status-err";
-          status.textContent = "Could not load /site: " + e.message;
+          status.textContent = "Planner error: " + e.message;
         }
+      }
+
+      async function init() {
+        const form = document.getElementById("planner-form");
+        document.getElementById("demo-site-btn").addEventListener("click", () => {
+          form.lat.value = "-89.46316";
+          form.lon.value = "222.51045";
+        });
+        form.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          runPlanner(form);
+        });
+        await loadTemplates(form);
+        runPlanner(form);
       }
 
       init();
