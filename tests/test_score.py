@@ -1,6 +1,5 @@
-# S4 locked defaults: layer 1 is normalized hours of slack, layer 2 is
-# neutral (hazards ignored until P13), and feasible minima combine by minimum
-# normalized slack; infeasible plans score zero, with no global-best comparison.
+# S4 + P13: layer 0 surface minima zero the score; layer 1 is normalized slack;
+# layer 2 hazard weights remain deferred.
 
 from __future__ import annotations
 
@@ -70,20 +69,42 @@ def test_required_simultaneous_sun_and_earth_is_a_hard_minimum() -> None:
     assert "both" in str(result["breakdown"]).lower()
 
 
-def test_surface_hazards_do_not_make_an_otherwise_valid_plan_infeasible() -> None:
+def test_surface_temperature_above_planner_maximum_is_infeasible() -> None:
     result = score(
         series={
             "longest_night_h": 40,
             "longest_no_earth_h": 10,
             "any_both": True,
         },
-        hazards={"temperature": 999},
+        hazards={"aggregate": {"temperature_k": 400.0, "soil_resistance": 1e6}},
         needs={
             "max_night_h": 50,
             "max_no_earth_h": 20,
+            "max_temperature_k": 350.0,
             "require_both": False,
         },
     )
 
-    assert result["feasible"] is True
-    assert result["score"] == pytest.approx(0.2)
+    assert result["feasible"] is False
+    assert result["score"] == 0
+    assert "temperature" in result["breakdown"]["failing"]
+
+
+def test_surface_soil_resistance_below_minimum_is_infeasible() -> None:
+    result = score(
+        series={
+            "longest_night_h": 40,
+            "longest_no_earth_h": 10,
+            "any_both": True,
+        },
+        hazards={"aggregate": {"temperature_k": 250.0, "soil_resistance": 100.0}},
+        needs={
+            "max_night_h": 50,
+            "max_no_earth_h": 20,
+            "min_soil_resistance": 500.0,
+            "require_both": False,
+        },
+    )
+
+    assert result["feasible"] is False
+    assert "dust" in result["breakdown"]["failing"]

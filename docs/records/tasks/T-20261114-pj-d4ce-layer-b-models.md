@@ -5,7 +5,7 @@ kind: decide
 owner: pj
 branch: scope/ops-skeleton
 created: 2026-11-14T14:43:11Z
-stage: decide
+stage: done
 relates: [T-20261114-pj-b63a, T-20261114-pj-12b7]
 ---
 # Lock layer-B temperature and dust models
@@ -21,7 +21,7 @@ Done means: temperature and dust each have a recorded quantity (or an explicit "
 
 ## Pending checkpoint
 
-Decision `own`: qué número es la temperatura — awaiting falsification. Heard: day bin if day, night bin if night; if the exact point is missing, distance-weighted mean of the two nearest. Sun-angle question held until after this answer. No options shown.
+None.
 
 ## Orientation
 
@@ -30,6 +30,13 @@ Decision `own`: qué número es la temperatura — awaiting falsification. Heard
 - Decisions surfaced: temperature quantity; dust quantity; role of planner limits; related slope/roughness/PSR terms; provider fields.
 
 ## Decisions
+
+- D-20261114-pj-41a2 — Temperature is the polar seasonal local-time climatology
+- D-20261114-pj-affb — Missing temperature pixels use four-quadrant inverse distance
+- D-20261114-pj-050d — Dust term is Apollo-average soil resistance with PGDA slope; rock and roughness out
+- D-20261114-pj-5cfa — Planner temperature and dust limits fail-close; core score view in UI
+- D-20261114-pj-bf69 — PSR is an initial impossible-site check; other related maps stay out
+- D-20261114-pj-8764 — SurfaceHazardProvider returns per-hour fields plus provenance
 
 ## Auto decisions
 

@@ -64,7 +64,7 @@ Assuming the engine exists — that is another scope. It gives the maxima (hours
 | score_layer2 | weighted_remaining_factors | Temperature, dust, extra hours; simple combination (e.g. a sum) |
 | score_layer_combination | deferred — how layer 1 and 2 combine so layer 2 cannot wash out assurance; lock when S4 is specified | |
 | score_infeasible_signal | deferred — signal the search uses among all-zero scores to walk toward feasible (`D-60ab`); lock with S6 | |
-| score_surface_as_minima | deferred — whether planner temp/dust limits fail-close (layer 0) or only rank in layer 2; lock at P13 | |
+| score_surface_as_minima | temperature_and_dust_fail_close_layer_0 | Settled by `D-20261114-pj-5cfa` |
 
 ## Expected behavior and validation
 
