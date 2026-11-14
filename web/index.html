@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Horizon planner — mock V0</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --anorthosite: #1a1c22;
+        --anorthosite-mid: #2a2e38;
+        --frost: #8b93a8;
+        --frost-dim: #5c6378;
+        --gold-graze: #c9a227;
+        --gold-dim: #8a7020;
+        --earth-disc: #6a8faa;
+        --both-case: #4a6b5c;
+        --neither: #3d3f48;
+        --ink: #d8dce6;
+        --ink-quiet: #9aa2b4;
+        --ring: #3f4556;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Libre Franklin", system-ui, sans-serif;
+        font-size: 15px;
+        line-height: 1.45;
+        color: var(--ink);
+        background: radial-gradient(ellipse 120% 80% at 50% 0%, #252830 0%, var(--anorthosite) 55%);
+      }
+
+      main {
+        max-width: 52rem;
+        margin: 0 auto;
+        padding: 1.5rem 1.25rem 3rem;
+      }
+
+      header h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .tag-mock {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.7rem;
+        font-weight: 500;
+        color: var(--gold-dim);
+        letter-spacing: 0.04em;
+      }
+
+      .lede {
+        margin: 0.5rem 0 1.25rem;
+        color: var(--frost);
+        max-width: 38em;
+      }
+
+      .chart-panel {
+        background: var(--anorthosite-mid);
+        border: 1px solid var(--ring);
+        padding: 1rem 0.75rem 0.5rem;
+      }
+
+      #polar-chart {
+        display: block;
+        width: 100%;
+        max-width: 440px;
+        height: auto;
+        margin: 0 auto;
+      }
+
+      .case-strip {
+        display: grid;
+        grid-template-columns: repeat(24, 1fr);
+        gap: 2px;
+        margin: 0.75rem auto 0;
+        max-width: 440px;
+        height: 10px;
+      }
+
+      .case-strip [role="presentation"] {
+        border-radius: 1px;
+        min-height: 10px;
+      }
+
+      .case-sun {
+        background: var(--gold-graze);
+      }
+      .case-earth {
+        background: var(--earth-disc);
+      }
+      .case-both {
+        background: var(--both-case);
+      }
+      .case-neither {
+        background: var(--neither);
+      }
+
+      .case-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem 1.5rem;
+        margin: 0.65rem auto 0;
+        max-width: 440px;
+        font-size: 0.78rem;
+        color: var(--ink-quiet);
+      }
+
+      .case-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .swatch {
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 1px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem 1.5rem;
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid var(--ring);
+      }
+
+      @media (max-width: 420px) {
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .metrics h2 {
+        margin: 0 0 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--frost-dim);
+        letter-spacing: 0.06em;
+      }
+
+      dl {
+        margin: 0;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.82rem;
+      }
+
+      dt {
+        color: var(--ink-quiet);
+        font-size: 0.72rem;
+        margin-top: 0.35rem;
+      }
+
+      dt:first-child {
+        margin-top: 0;
+      }
+
+      dd {
+        margin: 0.1rem 0 0;
+        color: var(--ink);
+      }
+
+      .score-val {
+        font-size: 1.5rem;
+        color: var(--gold-graze);
+      }
+
+      .provenance {
+        margin-top: 0.75rem;
+        font-size: 0.72rem;
+        color: var(--frost-dim);
+        line-height: 1.5;
+      }
+
+      footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--ring);
+        font-size: 0.75rem;
+        color: var(--frost-dim);
+      }
+
+      .status-err {
+        color: #c46;
+        padding: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="tag-mock">Mock · V0</p>
+        <h1>South-polar horizon operate mode</h1>
+        <p class="lede">
+          Polar sky chart for site survey plate review. Azimuth clockwise from north at top;
+          elevation outward. Tracks and mask are illustrative mock data only.
+        </p>
+      </header>
+
+      <section class="chart-panel" aria-labelledby="chart-heading">
+        <h2 id="chart-heading" class="visually-hidden" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">
+          Polar horizon sky chart
+        </h2>
+        <div id="load-status" role="status"></div>
+        <svg id="polar-chart" viewBox="0 0 400 400" role="img" aria-labelledby="svg-title svg-desc">
+          <title id="svg-title">Horizon mask with Sun and Earth tracks</title>
+          <desc id="svg-desc">Filled topographic horizon silhouette with polylines for Sun and Earth positions over 24 hours.</desc>
+        </svg>
+        <div class="case-strip" id="case-strip" aria-label="Hourly visibility cases"></div>
+        <div class="case-legend" aria-hidden="true">
+          <span><i class="swatch case-sun"></i> Sun above mask</span>
+          <span><i class="swatch case-earth"></i> Earth up</span>
+          <span><i class="swatch case-both"></i> Both</span>
+          <span><i class="swatch case-neither"></i> Neither</span>
+        </div>
+      </section>
+
+      <section class="metrics" id="metrics" hidden>
+        <div>
+          <h2>Needs thresholds</h2>
+          <dl id="needs-dl"></dl>
+        </div>
+        <div>
+          <h2>Score</h2>
+          <p class="score-val" id="score-display">—</p>
+          <dl id="series-dl"></dl>
+          <p class="provenance" id="provenance"></p>
+        </div>
+      </section>
+
+      <footer>
+        lunar-eval horizon planner mock V0 — not affiliated with or endorsed by NASA.
+        Coordinates and series are hardcoded for CI; no SPICE or DEM queries.
+      </footer>
+    </main>
+
+    <script>
+      const CX = 200;
+      const CY = 200;
+      const R_MAX = 168;
+      const EL_MAX = 8;
+
+      function azElevToXY(azDeg, elDeg) {
+        const rad = ((azDeg - 90) * Math.PI) / 180;
+        const r = (Math.max(elDeg, 0) / EL_MAX) * R_MAX;
+        return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+      }
+
+      function elNS(tag, attrs) {
+        const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+        Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, String(v)));
+        return el;
+      }
+
+      function drawPolarChart(data) {
+        const svg = document.getElementById("polar-chart");
+        while (svg.childNodes.length > 2) {
+          svg.removeChild(svg.lastChild);
+        }
+
+        const gGrid = elNS("g", { class: "grid", fill: "none", stroke: "#3f4556", "stroke-width": "0.5" });
+        for (let el = 2; el <= EL_MAX; el += 2) {
+          gGrid.appendChild(elNS("circle", { cx: CX, cy: CY, r: (el / EL_MAX) * R_MAX }));
+        }
+        const labels = ["N", "E", "S", "W"];
+        const azLabel = [0, 90, 180, 270];
+        labels.forEach((lab, i) => {
+          const p = azElevToXY(azLabel[i], EL_MAX + 0.6);
+          const t = elNS("text", {
+            x: p.x,
+            y: p.y,
+            fill: "#8b93a8",
+            "font-size": "11",
+            "font-family": "IBM Plex Mono, monospace",
+            "text-anchor": "middle",
+            "dominant-baseline": "middle",
+          });
+          t.textContent = lab;
+          gGrid.appendChild(t);
+        });
+        svg.appendChild(gGrid);
+
+        const mask = data.mask.elevation_deg;
+        const pts = [];
+        for (let i = 0; i < 720; i++) {
+          const az = i * 0.5;
+          const el = mask[i];
+          const p = azElevToXY(az, el);
+          pts.push(`${p.x},${p.y}`);
+        }
+        const origin = azElevToXY(0, 0);
+        const pathD = `M ${origin.x},${origin.y} L ${pts.join(" L ")} Z`;
+        const gMask = elNS("g", { class: "mask" });
+        gMask.appendChild(
+          elNS("path", {
+            d: pathD,
+            fill: "#6b6370",
+            stroke: "#c4b8a8",
+            "stroke-width": "1.6",
+            opacity: "0.95",
+          })
+        );
+        svg.appendChild(gMask);
+
+        function polylineFromSky(keyAz, keyEl, stroke, width, opacity) {
+          const parts = data.sky.map((s) => {
+            const p = azElevToXY(s[keyAz], s[keyEl]);
+            return `${p.x},${p.y}`;
+          });
+          return elNS("polyline", {
+            points: parts.join(" "),
+            fill: "none",
+            stroke,
+            "stroke-width": width,
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            opacity,
+          });
+        }
+
+        const gTracks = elNS("g", { class: "tracks" });
+        gTracks.appendChild(polylineFromSky("earth_az_deg", "earth_el_deg", "#6a8faa", 1.4, 0.95));
+        gTracks.appendChild(polylineFromSky("sun_az_deg", "sun_el_deg", "#c9a227", 1.8, 1));
+
+        data.sky.forEach((s, i) => {
+          if (i % 3 !== 0) return;
+          const pSun = azElevToXY(s.sun_az_deg, s.sun_el_deg);
+          gTracks.appendChild(elNS("circle", { cx: pSun.x, cy: pSun.y, r: 2.2, fill: "#c9a227" }));
+          const pEarth = azElevToXY(s.earth_az_deg, s.earth_el_deg);
+          gTracks.appendChild(elNS("circle", { cx: pEarth.x, cy: pEarth.y, r: 1.6, fill: "#6a8faa" }));
+        });
+        svg.appendChild(gTracks);
+
+        const strip = document.getElementById("case-strip");
+        strip.innerHTML = "";
+        data.sky.forEach((s, i) => {
+          const sf = data.series.sun_fraction[i] > 0.5;
+          const ef = data.series.earth_fraction[i] > 0.5;
+          let cls = "case-neither";
+          if (sf && ef) cls = "case-both";
+          else if (sf) cls = "case-sun";
+          else if (ef) cls = "case-earth";
+          const cell = document.createElement("div");
+          cell.setAttribute("role", "presentation");
+          cell.className = cls;
+          cell.title = s.time_utc;
+          strip.appendChild(cell);
+        });
+
+        const metrics = document.getElementById("metrics");
+        metrics.hidden = false;
+
+        const needs = data.needs;
+        document.getElementById("needs-dl").innerHTML = `
+          <dt>Max continuous night</dt><dd>${needs.max_night_h} h</dd>
+          <dt>Max gap without Earth</dt><dd>${needs.max_no_earth_h} h</dd>
+        `;
+
+        const sc = data.score;
+        document.getElementById("score-display").textContent = sc.feasible
+          ? sc.score.toFixed(3)
+          : "0.000 (infeasible)";
+
+        const ser = data.series;
+        document.getElementById("series-dl").innerHTML = `
+          <dt>Longest night</dt><dd>${ser.longest_night_h} h</dd>
+          <dt>Longest no-Earth</dt><dd>${ser.longest_no_earth_h} h</dd>
+          <dt>Any sun ∧ Earth</dt><dd>${ser.any_both ? "yes" : "no"}</dd>
+        `;
+
+        const prov = sc.provenance;
+        document.getElementById("provenance").textContent =
+          `Formula: ${prov.score_formula} · schedule ${prov.schedule_version}`;
+      }
+
+      async function init() {
+        const status = document.getElementById("load-status");
+        try {
+          const res = await fetch("/site");
+          if (!res.ok) throw new Error(res.statusText);
+          const data = await res.json();
+          status.textContent = "";
+          drawPolarChart(data);
+        } catch (e) {
+          status.className = "status-err";
+          status.textContent = "Could not load /site: " + e.message;
+        }
+      }
+
+      init();
+    </script>
+  </body>
+</html>

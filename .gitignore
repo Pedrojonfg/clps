@@ -4,3 +4,24 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+dist/
+build/
+
+# Local data (DEMs, kernels, masks — never in git)
+data/dem/
+data/kernels/
+data/masks/
+data/precompute/
+data/fixtures/
+
+# Isolated worktrees / agent scratch
+.worktrees/
+.superpowers/
+
