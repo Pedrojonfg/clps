@@ -10,7 +10,7 @@ domain: problem framing
 task: T-20261111-pj-c84f
 concepts: [user job, four visibility cases]
 supersedes: []
-relates: [D-20261111-pj-ea51]
+relates: [D-20261111-pj-ea51, D-20261114-pj-3c91, D-20261114-pj-9f04, D-20261114-pj-b8d3]
 ai: options+critique
 ---
 # Product question: scored site-time evaluation under planner constraints
