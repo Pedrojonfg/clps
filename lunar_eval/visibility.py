@@ -74,6 +74,8 @@ def series(sky, horizon, *, sun_threshold: float = 0.0, earth_threshold: float =
         "longest_night_h": longest_night_h(sun_frac, sun_threshold),
         "longest_no_earth_h": longest_night_h(earth_frac, earth_threshold),
         "longest_lit_h": longest_lit_h(sun_frac, sun_threshold, bridge_h),
+        "hours_sun_above_threshold": int(np.sum(sun_frac > sun_threshold)),
+        "hours_earth_above_threshold": int(np.sum(earth_frac > earth_threshold)),
         "any_both": bool(
             np.any((sun_frac > sun_threshold) & (earth_frac > earth_threshold))
         ),

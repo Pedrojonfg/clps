@@ -84,6 +84,7 @@ def build_planner_payload(
         "max_night_h": int(needs["max_night_h"]),
         "max_no_earth_h": int(needs["max_no_earth_h"]),
         "require_both": bool(needs.get("require_both", False)),
+        "min_continuous_lit_h": int(needs.get("min_continuous_lit_h", 0)),
     }
     if hazards_enabled and raw_hz.get("aggregate"):
         agg = raw_hz["aggregate"]

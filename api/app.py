@@ -49,12 +49,13 @@ def _mock_site_payload() -> dict:
         earth_frac.append(1.0 if earth_el > 0.5 else 0.0)
 
     from lunar_eval.score import score
-    from lunar_eval.visibility import longest_night_h
+    from lunar_eval.visibility import longest_lit_h, longest_night_h
 
     needs = {
         "max_night_h": 72,
         "max_no_earth_h": 48,
         "require_both": False,
+        "min_continuous_lit_h": 0,
         "sun_lit_percent": 50,
         "earth_lit_percent": 50,
         "sun_lit_threshold": 0.5,
@@ -66,6 +67,9 @@ def _mock_site_payload() -> dict:
         "earth_fraction": earth_frac,
         "longest_night_h": longest_night_h(sun_frac),
         "longest_no_earth_h": longest_night_h(earth_frac),
+        "longest_lit_h": longest_lit_h(sun_frac, lit_threshold=0.0, bridge_h=5),
+        "hours_sun_above_threshold": int(sum(1 for v in sun_frac if v > 0.0)),
+        "hours_earth_above_threshold": int(sum(1 for v in earth_frac if v > 0.0)),
         "any_both": any(sf and ef for sf, ef in zip(sun_frac, earth_frac, strict=True)),
         "schedule_version": SCHEDULE_VERSION,
     }
@@ -114,6 +118,7 @@ def site(
     template_id: str | None = Query(None),
     max_night_h: int | None = Query(None),
     max_no_earth_h: int | None = Query(None),
+    min_continuous_lit_h: int = Query(0, ge=0),
     require_both: bool = Query(False),
     sun_lit_percent: float = Query(0, ge=0, le=100),
     earth_lit_percent: float = Query(0, ge=0, le=100),
@@ -144,6 +149,7 @@ def site(
         "max_night_h": max_night_h if max_night_h is not None else 72,
         "max_no_earth_h": max_no_earth_h if max_no_earth_h is not None else 48,
         "require_both": require_both,
+        "min_continuous_lit_h": min_continuous_lit_h,
     }
     if tpl:
         sun_pct = tpl["sun_lit_percent"]

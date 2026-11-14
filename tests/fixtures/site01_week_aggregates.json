@@ -1,0 +1,38 @@
+{
+  "decisions": [
+    "D-beb5",
+    "D-7520",
+    "D-6ce5",
+    "D-7af3"
+  ],
+  "site": {
+    "lat_deg": -89.46316,
+    "lon_deg": 222.51045
+  },
+  "window": {
+    "start": "2027-01-01T00:00:00Z",
+    "end": "2027-01-07T23:00:00Z",
+    "step_h": 1
+  },
+  "needs": {
+    "max_night_h": 72,
+    "max_no_earth_h": 48,
+    "require_both": false,
+    "min_continuous_lit_h": 0
+  },
+  "sun_lit_percent": 0,
+  "earth_lit_percent": 0,
+  "bridge_h": 5,
+  "longest_night_h": 11,
+  "longest_no_earth_h": 168,
+  "longest_lit_h": 154,
+  "hours_sun_above_threshold": 157,
+  "hours_earth_above_threshold": 0,
+  "any_both": false,
+  "feasible": false,
+  "failing": [
+    "no_earth"
+  ],
+  "score": 0,
+  "score_formula": "product_phi_slack_bonus_capped"
+}
