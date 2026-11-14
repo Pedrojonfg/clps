@@ -250,6 +250,39 @@
         color: #c46;
         padding: 1rem;
       }
+
+      .local-search {
+        grid-column: 1 / -1;
+        margin-top: 0.5rem;
+      }
+
+      .local-search table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.72rem;
+      }
+
+      .local-search th,
+      .local-search td {
+        border: 1px solid var(--ring);
+        padding: 0.25rem 0.35rem;
+        text-align: left;
+      }
+
+      .local-search th {
+        color: var(--frost-dim);
+        font-weight: 500;
+      }
+
+      .local-search .pick-row {
+        background: rgba(201, 162, 39, 0.08);
+      }
+
+      .local-search .gap-star::after {
+        content: " *";
+        color: var(--gold-graze);
+      }
     </style>
   </head>
   <body>
@@ -282,6 +315,7 @@
         <label>Shadow bridge (h) <input name="bridge_h" type="number" min="0" max="48" value="5" /></label>
         <label><input name="require_both" type="checkbox" /> Require Sun and Earth together</label>
         <label><input name="hazards_enabled" type="checkbox" checked /> Layer-B hazards in score</label>
+        <label><input name="local_search" type="checkbox" /> Local search (time slide)</label>
         <div class="planner-actions">
           <button type="submit" class="primary">Run planner</button>
           <button type="button" id="demo-site-btn">Demo site (PGDA Site01)</button>
@@ -316,6 +350,26 @@
           <p class="score-val" id="score-display">—</p>
           <dl id="series-dl"></dl>
           <p class="provenance" id="provenance"></p>
+        </div>
+        <div class="local-search" id="local-search-panel" hidden>
+          <h2>Local search</h2>
+          <label style="font-size: 0.78rem; color: var(--ink-quiet); margin-bottom: 0.35rem; display: block">
+            <input type="checkbox" id="hide-gap-stars" /> Hide hazard-gap rows (*)
+          </label>
+          <table id="local-search-table" aria-label="Local search leaderboard">
+            <thead>
+              <tr>
+                <th>Pick</th>
+                <th>Start</th>
+                <th>Feasible</th>
+                <th>Score</th>
+                <th>Companion</th>
+                <th>Δ h</th>
+                <th>km</th>
+              </tr>
+            </thead>
+            <tbody id="local-search-body"></tbody>
+          </table>
         </div>
       </section>
 
@@ -472,6 +526,41 @@
         const prov = sc.provenance;
         document.getElementById("provenance").textContent =
           `Formula: ${prov.score_formula} · schedule ${prov.schedule_version}`;
+
+        renderLocalSearch(data);
+      }
+
+      function renderLocalSearch(data) {
+        const panel = document.getElementById("local-search-panel");
+        const body = document.getElementById("local-search-body");
+        const ls = data.local_search;
+        if (!ls || !ls.leaderboard?.length) {
+          panel.hidden = true;
+          body.innerHTML = "";
+          return;
+        }
+        panel.hidden = false;
+        const hideStars = document.getElementById("hide-gap-stars").checked;
+        const pick = ls.pick;
+        const rows = hideStars ? ls.leaderboard.filter((r) => !r.hazard_gap_star) : ls.leaderboard;
+        body.innerHTML = "";
+        rows.forEach((r) => {
+          const tr = document.createElement("tr");
+          if (pick && r.window_start === pick.window_start && r.site?.lat_deg === pick.site?.lat_deg) {
+            tr.className = "pick-row";
+          }
+          if (r.hazard_gap_star) tr.classList.add("gap-star");
+          tr.innerHTML = `
+            <td>${tr.classList.contains("pick-row") ? "★" : ""}</td>
+            <td>${r.window_start ?? "—"}</td>
+            <td>${r.feasible ? "yes" : "no"}</td>
+            <td>${Number(r.score).toFixed(3)}</td>
+            <td>${Number(r.companion_score).toFixed(3)}</td>
+            <td>${Number(r.distance_hours).toFixed(1)}</td>
+            <td>${Number(r.distance_km).toFixed(3)}</td>
+          `;
+          body.appendChild(tr);
+        });
       }
 
       function toUtcIso(localValue) {
@@ -497,6 +586,7 @@
           p.set("bridge_h", form.bridge_h.value);
         }
         p.set("hazards_enabled", form.hazards_enabled.checked ? "true" : "false");
+        if (form.local_search?.checked) p.set("local_search", "1");
         return p.toString();
       }
 
@@ -554,6 +644,7 @@
           } else {
             tag.textContent = "Mock";
           }
+          window.__lastPayload = body;
           drawPolarChart(body);
         } catch (e) {
           status.className = "status-err";
@@ -570,6 +661,9 @@
         form.addEventListener("submit", (ev) => {
           ev.preventDefault();
           runPlanner(form);
+        });
+        document.getElementById("hide-gap-stars")?.addEventListener("change", () => {
+          if (window.__lastPayload) renderLocalSearch(window.__lastPayload);
         });
         await loadTemplates(form);
         runPlanner(form);

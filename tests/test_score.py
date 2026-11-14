@@ -378,3 +378,106 @@ def test_provenance_cites_new_formula_sigmas_and_decisions() -> None:
     for ref in ("d-7520", "d-7af3", "d-6ce5"):
         assert ref in text
     assert "sigma" in text
+
+
+# --- companion_score on infeasible (D-5577) -----------------------------------------
+# Display score stays 0 when layer 0 fails; companion_score = R x bonus with the same
+# Φ/σ/β/cap as the feasible path, computed even with negative slacks.
+
+NEEDS_BASE = {"max_night_h": 50, "max_no_earth_h": 20, "require_both": False}
+
+
+def test_infeasible_night_has_zero_score_and_companion_from_negative_slack() -> None:
+    series = {
+        "longest_night_h": 52,  # slack -2 -> Φ(-0.4)
+        "longest_no_earth_h": 10,
+        "any_both": True,
+        "hours_sun_above_threshold": 10,
+        "hours_earth_above_threshold": 5,
+        "sun_fraction": [0.0] * 20,
+    }
+    result = score(series=series, hazards={}, needs=NEEDS_BASE)
+    want, want_r, _ = expected_score(series, NEEDS_BASE)
+    assert want_r == pytest.approx(phi(-0.4) * phi(10.0), rel=1e-9)
+    assert result["feasible"] is False
+    assert result["score"] == 0
+    assert "night" in result["breakdown"]["failing"]
+    assert result["companion_score"] == pytest.approx(want, rel=1e-9)
+    assert result["companion_score"] > 0
+
+
+def test_feasible_companion_score_equals_display_score() -> None:
+    series = {"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True}
+    result = score(series=series, hazards={}, needs=NEEDS_BASE)
+    assert result["feasible"] is True
+    assert result["companion_score"] == pytest.approx(result["score"], rel=1e-12)
+
+
+def test_companion_ranks_less_bad_infeasible_higher() -> None:
+    mild = score({"longest_night_h": 52, "longest_no_earth_h": 10, "any_both": True}, {}, NEEDS_BASE)
+    bad = score({"longest_night_h": 70, "longest_no_earth_h": 10, "any_both": True}, {}, NEEDS_BASE)
+    assert mild["score"] == bad["score"] == 0
+    assert mild["companion_score"] > bad["companion_score"] > 0
+
+
+def test_companion_with_multiple_failures_matches_formula_including_lit() -> None:
+    series = {
+        "longest_night_h": 55,
+        "longest_no_earth_h": 22,
+        "longest_lit_h": 6,
+        "any_both": True,
+        "hours_sun_above_threshold": 8,
+        "hours_earth_above_threshold": 4,
+        "sun_fraction": [0.0] * 30,
+    }
+    needs = {**NEEDS_BASE, "min_continuous_lit_h": 8}
+    result = score(series=series, hazards={}, needs=needs)
+    want, _, _ = expected_score(series, needs)
+    assert {"night", "no_earth", "lit"} <= set(result["breakdown"]["failing"])
+    assert result["score"] == 0
+    assert result["companion_score"] == pytest.approx(want, rel=1e-9)
+
+
+def test_surface_fail_keeps_companion_from_slacks() -> None:
+    series = {"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True}
+    result = score(
+        series=series,
+        hazards={"aggregate": {"temperature_k": 400.0, "soil_resistance": 1e6}},
+        needs={**NEEDS_BASE, "max_temperature_k": 350.0},
+    )
+    want, _, _ = expected_score(series, NEEDS_BASE, n=1)
+    assert result["feasible"] is False and result["score"] == 0
+    assert result["companion_score"] == pytest.approx(want, rel=1e-9)
+
+
+def test_companion_uplift_capped_at_thirty_percent() -> None:
+    series = {
+        "longest_night_h": 51,
+        "longest_no_earth_h": 20,
+        "any_both": True,
+        "hours_sun_above_threshold": 50,
+        "hours_earth_above_threshold": 50,
+        "sun_fraction": [1.0] * 50,
+    }
+    result = score(series=series, hazards={}, needs=NEEDS_BASE)
+    want, want_r, _ = expected_score(series, NEEDS_BASE)
+    assert want_r > 0
+    assert want <= want_r * (1.0 + MAX_UPLIFT) + 1e-12
+    assert result["companion_score"] == pytest.approx(want, rel=1e-9)
+
+
+def test_hazard_gap_star_set_for_missing_temperature_or_dust_only() -> None:
+    # per D-f57e: star only when a temperature/dust requirement has no hazard value.
+    series = {"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True}
+    temp_gap = score(series, {}, {**NEEDS_BASE, "max_temperature_k": 350.0})
+    dust_gap = score(series, {}, {**NEEDS_BASE, "min_soil_resistance": 500.0})
+    no_gap = score(
+        series,
+        {"aggregate": {"temperature_k": 250.0, "soil_resistance": 1e6}},
+        {**NEEDS_BASE, "max_temperature_k": 350.0, "min_soil_resistance": 500.0},
+    )
+    plain = score(series, {}, NEEDS_BASE)
+    assert temp_gap["hazard_gap_star"] is True
+    assert dust_gap["hazard_gap_star"] is True
+    assert not no_gap.get("hazard_gap_star")
+    assert not plain.get("hazard_gap_star")

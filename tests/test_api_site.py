@@ -94,3 +94,33 @@ def test_site_real_mask_not_mock_ridge() -> None:
     assert ptp > 1.0
     assert payload["score"]["provenance"]["schedule_version"] == "D-f369-v1"
     assert len(payload["sky"]) == 24
+
+def test_site_without_local_search_flag_has_no_local_search_block() -> None:
+    # per D-ecc9: flag off skips the search.
+    payload = client.get("/site?mock=1").json()
+    assert payload.get("local_search") is None
+
+
+@pytest.mark.skipif(not real_data_available(), reason="Site01 DEM or kernels not present")
+def test_site_local_search_flag_returns_pick_and_leaderboard() -> None:
+    # per D-ecc9: GET /site?local_search=1 returns local_search {pick, leaderboard}.
+    r = client.get(
+        "/site",
+        params={
+            "start": "2027-01-01T00:00:00Z",
+            "end": "2027-01-01T23:00:00Z",
+            "hazards_enabled": "false",
+            "local_search": 1,
+        },
+    )
+    assert r.status_code == 200, r.text
+    ls = r.json()["local_search"]
+    assert {"pick", "leaderboard"} <= ls.keys()
+    assert isinstance(ls["leaderboard"], list) and ls["leaderboard"]
+    row = ls["leaderboard"][0]
+    assert {"site", "window_start", "feasible", "score", "companion_score", "hazard_gap_star"} <= row.keys()
+    off = client.get(
+        "/site",
+        params={"start": "2027-01-01T00:00:00Z", "end": "2027-01-01T23:00:00Z", "hazards_enabled": "false"},
+    ).json()
+    assert off.get("local_search") is None

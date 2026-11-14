@@ -57,6 +57,7 @@ def build_planner_payload(
     earth_lit_percent: float,
     bridge_h: int,
     hazards_enabled: bool,
+    local_search: bool = False,
 ) -> dict:
     from lunar_eval.ephemeris import SpiceEphemeris
     from lunar_eval.hazards import ConstantHazards, MoonHazards
@@ -99,7 +100,7 @@ def build_planner_payload(
     else:
         scored["provenance"]["hazards"] = "disabled"
 
-    return {
+    payload: dict[str, Any] = {
         "data_source": "real",
         "mask": {
             "elevation_deg": np.asarray(horizon.elevation_deg, dtype=float).tolist(),
@@ -112,6 +113,7 @@ def build_planner_payload(
         "series": _series_json(vis),
         "score": scored,
         "hazards_enabled": hazards_enabled,
+        "hazards": hazards_payload,
         "needs": {
             **score_needs,
             "sun_lit_percent": float(sun_lit_percent),
@@ -122,6 +124,56 @@ def build_planner_payload(
             "template_id": needs.get("template_id"),
         },
     }
+
+    if local_search:
+        from lunar_eval.search.local import DEFAULT_RADIUS_KM, local_search as run_local_search
+
+        window_hours = max(len(times) - 1, 0)
+        anchor = np.datetime64(times[0], "s")
+        neighbour_sites: list[Site] = []  # per D-ecc9: no 1 km grid in prod path
+
+        def evaluate(candidate: Site, start, hours: int) -> dict:
+            t0 = np.datetime64(start, "s")
+            n = int(hours) + 1
+            win_times = t0 + (np.arange(n) * np.timedelta64(1, "h"))
+            sub = build_planner_payload(
+                candidate,
+                win_times,
+                needs=needs,
+                sun_lit_percent=sun_lit_percent,
+                earth_lit_percent=earth_lit_percent,
+                bridge_h=bridge_h,
+                hazards_enabled=hazards_enabled,
+                local_search=False,
+            )
+            hz = sub.get("hazards") or {}
+            sub_score = sub["score"]
+            gap = bool(sub_score.get("hazard_gap_star"))
+            return {"series": sub["series"], "hazards": hz, "hazard_gap_star": gap}
+
+        ls = run_local_search(
+            site,
+            anchor,
+            window_hours,
+            score_needs,
+            evaluate=evaluate,
+            neighbour_sites=neighbour_sites,
+            radius_km=DEFAULT_RADIUS_KM,
+        )
+
+        def _row_json(row: dict | None) -> dict | None:
+            if row is None:
+                return None
+            out = dict(row)
+            out["window_start"] = _iso_utc(np.datetime64(row["window_start"], "s"))
+            return out
+
+        payload["local_search"] = {
+            "pick": _row_json(ls["pick"]),
+            "leaderboard": [_row_json(r) for r in ls["leaderboard"]],
+        }
+
+    return payload
 
 
 def kernels_available() -> bool:
