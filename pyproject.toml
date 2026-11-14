@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lunar-eval"
+version = "0.1.0"
+description = "Lunar south-pole site×time evaluator (Sun/Earth vs local horizon)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "scipy",
+    "rasterio",
+    "fastapi",
+    "uvicorn[standard]",
+    "pyarrow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+sky = ["spiceypy"]
+
+[tool.setuptools.packages.find]
+include = ["lunar_eval*", "api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
