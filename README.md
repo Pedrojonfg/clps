@@ -1,72 +1,59 @@
-# CLPS Lunar Mission Browser (team product)
+# CLPS / lunar site×time evaluator (portfolio)
 
-NASA Space Apps Challenge 2026 — challenge **[CLPS Lunar Mission Browser](https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/)**.
+Solo portfolio project inspired by the NASA Space Apps Challenge 2026 brief **[CLPS Lunar Mission Browser](https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/)**. Not a contest team entry.
 
-This repository currently holds **product definition** (decision records + learning notes). Application code is not started yet. Engine/method decisions (score formula, search algorithms, data pipeline) are **deferred** to a future decision ledger.
+This repository holds **product definition** (decision records + learning notes). Application code is not started yet. Engine/method decisions (score formula, search algorithms, data pipeline, layer-B models) are **deferred** to a future decision ledger.
 
-## Challenge (what NASA asks)
+## Challenge heritage (what NASA asked)
 
 South-pole missions face extreme **lighting** and **communication** constraints. Existing tools (e.g. Quickmap, Moon Trek, JPL Horizons) can answer where the Sun and Earth sit relative to a landing site’s horizon, but their interfaces are hard to use for **rapid scenario comparison**.
 
-**Your challenge is to** build an intuitive tool so mission planners, educators, and the public can **compare landing sites and dates**, visualizing **Sun and Earth vs the local horizon** to assess:
+The brief’s core ask: compare **landing sites and dates**, visualizing **Sun and Earth vs the local horizon** for **solar power** and **direct-to-Earth (DTE)** windows.
 
-- **solar power** potential, and  
-- **direct-to-Earth (DTE)** communication windows.
-
-Full statement archive: [`docs/sources/challenge-statements/clps-lunar-mission-browser.md`](docs/sources/challenge-statements/clps-lunar-mission-browser.md). Official **Resources** tab was empty when archived (2026-11-11).
+Full statement archive: [`docs/sources/challenge-statements/clps-lunar-mission-browser.md`](docs/sources/challenge-statements/clps-lunar-mission-browser.md).
 
 ### Layer A vs layer B
 
-| Layer | In our product focus | Examples |
-|-------|----------------------|----------|
-| **A — Local sky at the site** | Yes | Sun/Earth elevation vs horizon; power & DTE windows |
-| **B — Full landing campaign** | Only if time + track rules allow (`decidable`) | Temperature, dust, trajectories, EDL roughness |
+| Layer | In product? | Examples |
+|-------|-------------|----------|
+| **A — Local sky at the site** | Yes (core) | Sun/Earth elevation vs horizon; power & DTE windows |
+| **B — Surface / ops hazards** | Yes (portfolio ambition) | Temperature, dust, related site hazards (`D-b8d3`) |
+| **Flight dynamics** | No (except optional filter) | Full Earth–Moon trajectory / ΔV optimization out; approach accessibility filter allowed |
 
 ---
 
-## Product decisions (accepted)
+## Product decisions (current)
 
 | ID | Title | Domain |
 |----|-------|--------|
-| [`D-20261111-pj-ea51`](docs/records/decisions/D-20261111-pj-ea51-audience-positioning.md) | Audience and positioning | problem framing |
-| [`D-20261111-pj-60ab`](docs/records/decisions/D-20261111-pj-60ab-product-question.md) | Product question | problem framing |
-| [`D-20261111-pj-5cf6`](docs/records/decisions/D-20261111-pj-5cf6-scope-48h.md) | 48h scope & definition of done | scope & success criteria |
+| [`D-20261111-pj-60ab`](docs/records/decisions/D-20261111-pj-60ab-product-question.md) | Product question (unchanged) | problem framing |
+| [`D-20261114-pj-7e2a`](docs/records/decisions/D-20261114-pj-7e2a-project-frame-solo-portfolio.md) | Solo portfolio frame | problem framing |
+| [`D-20261114-pj-3c91`](docs/records/decisions/D-20261114-pj-3c91-audience-portfolio.md) | Audience (supersedes `D-ea51`) | problem framing |
+| [`D-20261114-pj-9f04`](docs/records/decisions/D-20261114-pj-9f04-scope-portfolio.md) | Portfolio scope & done (supersedes `D-5cf6`) | scope & success criteria |
+| [`D-20261114-pj-b8d3`](docs/records/decisions/D-20261114-pj-b8d3-layer-b-bodies-trajectory.md) | Layer B / trajectory / multi-body | problem framing |
 
-Task that produced them: [`T-20261111-pj-c84f`](docs/records/tasks/T-20261111-pj-c84f-define-project.md) (product ledger closed; engine items deferred).
-
----
-
-## Who it is for (`D-ea51`)
-
-- **Primary user:** mission **planner** — backend depth of a real planning tool (constraints, scores, search).
-- **Same product, secondary users:** **educators** and **general power users** — not a separate toy app; they are served by an **explainable, approachable UI** (provenance of each datum, clear viz).
-- **UI modes:**
-  - **Default:** friendly + explainable.
-  - **Fallback:** more technical UI if friendliness slows a planner’s normal workflow — **without** dropping explainability.
-
-Intent for viz modalities: **2D** and **projective 3D** (exact set cut by scope below).
+Task: [`T-20261114-pj-a1b2`](docs/records/tasks/T-20261114-pj-a1b2-reopen-product-portfolio.md).
 
 ---
 
-## What question the product answers (`D-60ab`)
+## Who it is for (`D-3c91`)
 
-Not “pretty map only.” The product is **scored evaluation under planner constraints**, with search:
+- **Primary audience:** technical portfolio viewer (hiring / peer engineer reading the demo).
+- **Domain depth bar:** mission-planner-grade calculations and metrics.
+- **UI default:** technical + explainable (provenance required). Friendly educator skin optional later — not v1 done.
 
-1. Planner provides **date/time** (and site) plus **flexibility / thresholds** on outcomes, e.g.:
-   - max time without sunlight,
-   - max time without radio (Earth below horizon),
-   - requirement that sun **and** radio overlap,
-   - relative weights / other thresholds.
-2. System returns a **score**.
-   - If **minima fail** → score can be **zero**, then search over nearby **date/time** (and related inputs) for the **nearest feasible** case.
-   - Inspect **neighborhood** of the current inputs for a **substantial** score improvement.
-3. **Deep-search mode** (name TBD): user gives one or more **time–space ranges**; system seeks a **global** maximum under the same score logic.
-4. Score design (later, engine ledger) should reward staying **away from thresholds** and improving sun / radio / both-at-once windows.
-5. **Visualizations** accompany the loop; usefulness over cosmetics.
+---
 
-**Falsification (owner):** this product idea fails if local search is never conclusive, or if no reliable score can be built from planner needs — then fall back toward compare-only / hybrid.
+## What question the product answers (`D-60ab`, kept)
 
-Four visibility cases (mental model for windows):
+**Scored evaluation under planner constraints**, with search:
+
+1. Planner provides **date/time** (and site) plus **flexibility / thresholds** (max time without sun, without radio, need both, weights…).
+2. System returns a **score**; on minima fail → search toward nearest feasible; inspect **neighborhood** for gains.
+3. **Deep-search mode** over user-specified time–space ranges (name TBD).
+4. **Visualizations** accompany the loop; usefulness over cosmetics.
+
+Four visibility cases (mental model):
 
 | Case | Sun above horizon | Earth above horizon |
 |------|-------------------|---------------------|
@@ -75,38 +62,31 @@ Four visibility cases (mental model for windows):
 | Radio only | no | yes |
 | Neither | no | no |
 
-DTE means **direct** radio to Earth (no relay). Relay satellites change the problem; the challenge centers on horizon geometry for DTE.
-
 ---
 
-## Scope for the hackathon (`D-5cf6`)
+## Scope for portfolio v1 (`D-9f04` + `D-b8d3`)
 
 | Bucket | Includes |
 |--------|----------|
-| **Must** | One visualization; **needs-adapted score**; **explained thresholds** |
-| **Stretch** | Local search; global maximization (deep mode); friendly UI; additional visualizations |
-| **Decidable** (time / post-hackathon; check track compliance) | Temperature; dust; trajectories |
-| **Out** (or post-hackathon) | Native mobile app |
+| **Core** | Needs-adapted score; explained thresholds + provenance; useful viz set; local neighborhood search; deep-search mode |
+| **Layer B (surface)** | Temperature, dust, related site hazards (models in engine ledger) |
+| **Architecture** | Moon beachhead; **body-agnostic** providers so Mars/others can be a later pack |
+| **Out of v1** | Full trajectory optimization; native mobile; Mars feature parity |
+| **Optional bridge** | Approach / accessibility **filter** (consumes trajectory products; does not compute them) |
 
-**Definition of done (ambitious):** must **and** stretch delivered, and the **backend works well** — useful outcomes **X, Y, Z** to be defined in the engine/metrics ledger.
-
-**Risk (owner):** over-scoping so the engine does not actually work well. Schedule accordingly.
-
-Note: friendly UI is **stretch** here, while `D-ea51` treats it as the **default** mode — Sunday may ship technical + explainable without full “friendly” polish.
+**Definition of done:** defendable portfolio demo — backend useful under explicit **X, Y, Z** (engine ledger).
 
 ---
 
 ## Explicitly not decided yet (engine ledger)
 
-Open a separate decision-flow task for:
-
-- Score formula and success metrics **X, Y, Z**
+- Score formula and success metrics **X, Y, Z** (including how temp/dust enter)
 - Neighborhood / deep-search algorithms and stopping rules
 - Data path (Horizons vs precomputed maps vs LOLA/DEM horizon)
-- Technical validation level and public **claims**
-- Team roles / recruitment plan
+- Layer-B model choices and validation level
+- Public **claims** wording
 
-Domain brief (research): [`docs/research/briefs/research-brief-clps-domain.md`](docs/research/briefs/research-brief-clps-domain.md).
+Domain brief: [`docs/research/briefs/research-brief-clps-domain.md`](docs/research/briefs/research-brief-clps-domain.md).
 
 ---
 

@@ -4,7 +4,7 @@ default-branch: main
 ---
 # Project
 
-Team entry for the NASA Space Apps Challenge 2026, challenge "CLPS Lunar Mission Browser" (compare possible lunar landing sites and time windows; intermediate-advanced level). The hackathon runs 14-15 November 2026 and teams have at most 6 people. We are in a pre-recruitment phase: the project owner is first learning the problem and the available data, then deciding what the project consists of, so that a team can be recruited around a clear definition.
+Solo portfolio project: a **site×time landing evaluator** with a Moon beachhead (south-pole power and DTE under local horizon), inspired by the NASA Space Apps 2026 challenge “CLPS Lunar Mission Browser.” Not a contest team entry and not scheduled against the 14–15 November 2026 hackathon window. Owner builds alone; challenge text is heritage for the problem shape (`D-20261114-pj-7e2a`).
 
 ## Language
 
@@ -16,41 +16,46 @@ Team entry for the NASA Space Apps Challenge 2026, challenge "CLPS Lunar Mission
 | Domain | Mode | Notes |
 |--------|------|-------|
 | problem framing | own | the question the project answers and for whom |
-| scope & success criteria | own | what is in/out for 48 hours, what "done" means |
+| scope & success criteria | own | what is in/out for portfolio v1, what "done" means |
 | method & validation | own | everything that changes what is computed, against what it is checked, what error is acceptable |
 | data & sources | own | datasets, versions, which sites/regions, what is cited |
 | claims & interpretation | own | what the project says its results show |
-| team & roles | own | who is recruited, what each person owns |
-| rules & eligibility | advise | AI checks the official rules; the owner confirms. Never auto |
-| architecture | advise | |
+| team & roles | own | solo; no recruitment |
+| architecture | advise | include body-agnostic seams early (`D-b8d3`) |
 | contracts | advise | data formats between modules |
 | testing | advise | |
-| presentation | advise | video, story, submission page |
+| presentation | advise | portfolio README, demo story (not Space Apps submission page) |
 | dependencies & ops | advise | libraries, hosting, licences |
 | engineering hygiene | auto | naming, layout, style matching the repo |
+| rules & eligibility (Space Apps) | out | not targeting contest submission |
 
 When unsure, prefer own over advise, and advise over auto. `people/<h>.md` may tighten a mode for one person.
-Everyone defends every own decision: no (revisit when the team is formed)
+Owner defends every own decision; reopen explicitly via a new decision record (do not silently drift).
 
 ## Sources
 
-- `docs/sources/challenge-statements/clps-lunar-mission-browser.md` — full statement (Background, Objectives, Considerations) from owner copy 2026-11-11; Resources tab empty at copy time.
-- https://www.spaceappschallenge.org/resources/participant-faqs/ — dates: summaries Sep 17, full statements Oct 28, submission guides Nov 13.
-- https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/ — official URL; paste full statement here when available (overrides mirrors).
-- https://nasaspaceapps.ae/challenges — unofficial mirror with full CLPS Lunar Mission Browser brief text (2026-11-11). Use only until official brief is archived in-repo.
-- https://naif.jpl.nasa.gov/pub/naif/pds/pds4/clps/clps_spice/document/spiceds_v003.html — CLPS SPICE Data Archive documentation (kernels, missions, landing-related SPK naming).
-- https://ntrs.nasa.gov/citations/20240005553 — NASA Ames “Lunar Browser” trajectory tool (CLPS/Artemis trades; not the same as the hackathon product name alone).
-- `docs/research/briefs/research-brief-clps-domain.md` — focused domain brief (planning scales, data menu, challenge vs real landing factors) for decision-flow task T-20261111-pj-c84f.
+- `docs/sources/challenge-statements/clps-lunar-mission-browser.md` — full statement (Background, Objectives, Considerations) from owner copy 2026-11-11; Resources tab empty at copy time. Heritage only.
+- https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/ — official challenge URL (heritage).
+- https://naif.jpl.nasa.gov/pub/naif/pds/pds4/clps/clps_spice/document/spiceds_v003.html — CLPS SPICE Data Archive documentation.
+- https://ntrs.nasa.gov/citations/20240005553 — NASA Ames “Lunar Browser” trajectory tool (different product; out of our scope per `D-b8d3`).
+- `docs/research/briefs/research-brief-clps-domain.md` — domain brief for planning scales and data menu.
 - https://ssd.jpl.nasa.gov/horizons/ — JPL Horizons (ephemerides; surface observer geometry).
 - https://pgda.gsfc.nasa.gov/products/69 — PGDA polar illumination / Earth visibility maps.
 - https://trek.nasa.gov/moon/ — Moon Trek (LRO-based visualization tiles).
-- https://science.nasa.gov/universe/nasa-welcomes-all-ages-experience-levels-for-space-apps-challenge/ — NASA overview of the 2026 edition (focus areas, no programming required). Does not mention CLPS.
-- https://ntrs.nasa.gov/citations/20240005553 — "Lunar Browser" NASA Ames tool abstract (2024). Probably related to the challenge name; not confirmed by the challenge text.
-- https://www.spaceappschallenge.org/resources/judging-awards-guide — judging criteria (2022 PDF definitions read; 2026 version not read).
-- https://www.spaceappschallenge.org/legal/ — participant terms. NOT YET READ.
+- Official Space Apps challenge resources for Lunar Landing Site Navigator (QuickMap, Moon Trek, Horizons, CSA portal) — useful as viz/ephemeris references; datasets still LOLA/PDS for terrain.
+
+## Product decisions (current)
+
+| ID | Title | Status |
+|----|-------|--------|
+| `D-20261111-pj-60ab` | Product question (scored site-time + search) | accepted |
+| `D-20261114-pj-7e2a` | Solo portfolio frame | accepted |
+| `D-20261114-pj-3c91` | Audience (portfolio-technical) | accepted (supersedes `D-ea51`) |
+| `D-20261114-pj-9f04` | Portfolio scope & done | accepted (supersedes `D-5cf6`) |
+| `D-20261114-pj-b8d3` | Layer B surface / trajectory / multi-body | accepted |
 
 ## Milestones
 
-- 2026-11-13 — Challenge resources expected (one NASA post says so; another source says 28 October; unconfirmed)
-- 2026-11-14 — Hackathon starts (submission opening at 09:00 local per third-party listings; verify)
-- 2026-11-15 — Submission deadline, 23:59 local time (verify against the 2026 submission guide)
+- Product ledger closed for portfolio frame — 2026-11-14 (`T-20261114-pj-a1b2`)
+- Next: engine ledger (score/X,Y,Z, recommender, data/horizon, layer-B models, validation/claims)
+- No hackathon submission milestone
