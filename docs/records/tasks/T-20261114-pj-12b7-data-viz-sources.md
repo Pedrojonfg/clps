@@ -37,6 +37,7 @@ Agenda accepted by pj 2026-11-14 without changes. Warm-up answered ("ni idea"); 
 - D-20261114-pj-4ffe — Sun/Earth geometry computed locally from kernels; Horizons as test oracle
 - D-20261114-pj-f369 — Horizon mask from LOLA DEMs with a distance-graded resolution schedule to 250 km
 - D-20261114-pj-5994 — Precompute on pj's PC for the demo, then a Hetzner CX43 for the full cap and serving (advise)
+- D-20261114-pj-a3b3 — Space Apps submission targets the full portfolio scope; fallback cut only at the Sunday freeze
 
 ## Auto decisions
 
