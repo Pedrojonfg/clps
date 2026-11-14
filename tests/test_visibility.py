@@ -43,3 +43,37 @@ def test_longest_night_h(fraction: np.ndarray, expected: int) -> None:
 )
 def test_longest_lit_h(fraction: np.ndarray, bridge_h: int, expected: int) -> None:
     assert longest_lit_h(fraction, lit_threshold=0.0, bridge_h=bridge_h) == expected
+
+def test_series_exposes_hour_counts_consistent_with_fractions() -> None:
+    """D-7520: hours_*_above_threshold = count(fraction > threshold) over the series."""
+    from lunar_eval.providers import HorizonMask, SkySample
+    from lunar_eval.visibility import series
+
+    elevation = np.full(720, 10.0, dtype=np.float32)
+    horizon = HorizonMask(
+        elevation_deg=elevation,
+        x_m=0.0,
+        y_m=0.0,
+        lat=-89.46316,
+        lon=222.51045,
+        h0_m=0.0,
+        observer_height_m=2.0,
+        schedule_version="vis-hours-v1",
+        dem_ids=(),
+    )
+    t = np.datetime64("2027-06-01T00:00:00")
+    samples = [
+        SkySample(
+            t + np.timedelta64(i, "h"),
+            sun_az_deg=0.0,
+            sun_el_deg=el,
+            sun_radius_deg=RS,
+            earth_az_deg=0.0,
+            earth_el_deg=eel,
+            earth_radius_deg=0.5,
+        )
+        for i, (el, eel) in enumerate([(20.0, 90.0), (20.0, -90.0), (0.0, 90.0), (0.0, -90.0)])
+    ]
+    out = series(samples, horizon, sun_threshold=0.5, earth_threshold=0.5)
+    assert out["hours_sun_above_threshold"] == int((np.asarray(out["sun_fraction"]) > 0.5).sum()) == 2
+    assert out["hours_earth_above_threshold"] == int((np.asarray(out["earth_fraction"]) > 0.5).sum()) == 2

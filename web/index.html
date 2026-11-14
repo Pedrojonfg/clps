@@ -276,6 +276,7 @@
         </label>
         <label>Max night (h) <input name="max_night_h" type="number" value="72" /></label>
         <label>Max no-Earth (h) <input name="max_no_earth_h" type="number" value="48" /></label>
+        <label>Min continuous lit (h) <input name="min_continuous_lit_h" type="number" min="0" value="0" /></label>
         <label>Sun lit % <input name="sun_lit_percent" type="number" min="0" max="100" value="0" /></label>
         <label>Earth lit % <input name="earth_lit_percent" type="number" min="0" max="100" value="0" /></label>
         <label>Shadow bridge (h) <input name="bridge_h" type="number" min="0" max="48" value="5" /></label>
@@ -446,9 +447,10 @@
         document.getElementById("needs-dl").innerHTML = `
           <dt>Max continuous night</dt><dd>${needs.max_night_h} h</dd>
           <dt>Max gap without Earth</dt><dd>${needs.max_no_earth_h} h</dd>
+          <dt>Min continuous lit</dt><dd>${needs.min_continuous_lit_h ?? 0} h</dd>
           <dt>Sun lit threshold</dt><dd>${needs.sun_lit_percent ?? (sunThr * 100)}%</dd>
           <dt>Earth lit threshold</dt><dd>${needs.earth_lit_percent ?? (earthThr * 100)}%</dd>
-          <dt>Shadow bridge</dt><dd>${needs.bridge_h ?? "—"} h</dt>
+          <dt>Shadow bridge</dt><dd>${needs.bridge_h ?? "—"} h</dd>
           <dt>Hazards</dt><dd>${data.hazards_enabled ? "on" : "off"}</dd>
         `;
 
@@ -461,6 +463,9 @@
         document.getElementById("series-dl").innerHTML = `
           <dt>Longest night</dt><dd>${ser.longest_night_h} h</dd>
           <dt>Longest no-Earth</dt><dd>${ser.longest_no_earth_h} h</dd>
+          <dt>Longest continuous lit</dt><dd>${ser.longest_lit_h ?? "—"} h</dd>
+          <dt>Hours Sun above thr.</dt><dd>${ser.hours_sun_above_threshold ?? "—"}</dd>
+          <dt>Hours Earth above thr.</dt><dd>${ser.hours_earth_above_threshold ?? "—"}</dd>
           <dt>Any sun ∧ Earth</dt><dd>${ser.any_both ? "yes" : "no"}</dd>
         `;
 
@@ -485,6 +490,7 @@
         else {
           p.set("max_night_h", form.max_night_h.value);
           p.set("max_no_earth_h", form.max_no_earth_h.value);
+          p.set("min_continuous_lit_h", form.min_continuous_lit_h.value);
           p.set("require_both", form.require_both.checked ? "true" : "false");
           p.set("sun_lit_percent", form.sun_lit_percent.value);
           p.set("earth_lit_percent", form.earth_lit_percent.value);
@@ -497,6 +503,7 @@
       function applyTemplate(form, tpl) {
         form.max_night_h.value = tpl.max_night_h;
         form.max_no_earth_h.value = tpl.max_no_earth_h;
+        form.min_continuous_lit_h.value = tpl.min_continuous_lit_h ?? 0;
         form.sun_lit_percent.value = tpl.sun_lit_percent;
         form.earth_lit_percent.value = tpl.earth_lit_percent;
         form.bridge_h.value = tpl.bridge_h;
