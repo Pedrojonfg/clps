@@ -1,4 +1,4 @@
-"""Needs-adapted score (P4). # D-7520 D-6ce5 D-7af3 D-9e53 D-5cfa D-5577 D-f57e"""
+"""Needs-adapted score (P4). # D-7520 D-6ce5 D-48ee D-7af3 D-9e53 D-5cfa D-5577 D-f57e"""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ FORMULA = "product_phi_slack_bonus_capped"
 _SIGMA_NIGHT = 5.0  # per D-7520
 _SIGMA_LIT = 5.0  # per D-7520
 _SIGMA_NO_EARTH = 1.0  # per D-7520
-_BETA = 0.15  # per D-6ce5
-_MAX_UPLIFT = 0.30  # per D-6ce5
+_BETA = 0.25  # per D-20261115-pj-48ee
+_MAX_UPLIFT = 0.40  # per D-20261115-pj-48ee
 
 
 def _phi(z: float) -> float:
@@ -122,7 +122,7 @@ def score(series: dict, hazards: dict, needs: dict) -> dict:
     provenance = {
         "score_formula": FORMULA,
         "schedule_version": series.get("schedule_version", "n/a"),
-        "decisions": ["D-7520", "D-6ce5", "D-7af3", "D-9e53", "D-5cfa", "D-5577", "D-f57e"],
+        "decisions": ["D-7520", "D-6ce5", "D-48ee", "D-7af3", "D-9e53", "D-5cfa", "D-5577", "D-f57e"],
         "sigmas_h": {
             "night": _SIGMA_NIGHT,
             "lit": _SIGMA_LIT,
