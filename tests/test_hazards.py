@@ -6,6 +6,7 @@ import pytest
 from lunar_eval.hazards.fill import fill_nodata_quadrant_idw
 from lunar_eval.hazards.lst import lst_bin_index, local_solar_time_h_from_utc
 from lunar_eval.hazards.moon import MoonHazards, aggregate_hazards
+from lunar_eval.hazards.pcp import PolarPcpClimatology
 from lunar_eval.hazards.soil import soil_resistance
 from lunar_eval.hazards.temperature import ClimatologyTable
 from lunar_eval.providers import Site
@@ -74,3 +75,26 @@ def test_local_solar_time_shifts_with_longitude() -> None:
     lst0 = local_solar_time_h_from_utc(t, 0.0)
     lst_east = local_solar_time_h_from_utc(t, 90.0)
     assert lst_east == pytest.approx((lst0 + 6.0) % 24.0)
+
+
+def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
+    # Synthetic summer ltim01 around lon=0, lat=-89 (normalized stereo).
+    from lunar_eval.horizon import polar_stereo_xy
+    from lunar_eval.horizon.mask import R_M
+
+    x_m, y_m = polar_stereo_xy(-89.0, 0.0)
+    xn, yn = x_m / R_M, y_m / R_M
+    season_dir = tmp_path / "summer"
+    season_dir.mkdir()
+    np.savez_compressed(
+        season_dir / "ltim01.npz",
+        x=np.array([xn], dtype=np.float32),
+        y=np.array([yn], dtype=np.float32),
+        tbol=np.array([210.0], dtype=np.float32),
+        r_km=np.float32(1737.4),
+    )
+    pcp = PolarPcpClimatology(root=tmp_path)
+    val, meta = pcp.at_site_time(np.datetime64("2027-01-01T00:00"), -89.0, 0.0)
+    assert val == pytest.approx(210.0)
+    assert meta["lst_bin"] == 0
+    assert meta["product"].startswith("urn:nasa:pds:lro_diviner_derived1")

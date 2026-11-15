@@ -17,7 +17,7 @@ class ClimatologyTable:
 
     bins_k: dict[int, float]
     season: str = "unspecified"
-    product: str = "deferred_pds_pcp"
+    product: str = "urn:nasa:pds:lro_diviner_derived1:data_derived_pcp"
 
     def at_lst(self, lst_h: float) -> tuple[float | None, dict]:
         idx = lst_bin_index(lst_h)
@@ -38,7 +38,7 @@ class RasterClimatology:
 
     values: NDArray[np.float64]
     season: str
-    product: str = "deferred_pds_pcp"
+    product: str = "urn:nasa:pds:lro_diviner_derived1:data_derived_pcp"
 
     def at_site_time(self, time_utc: np.datetime64, lon_deg: float) -> tuple[float | None, dict]:
         lst = local_solar_time_h_from_utc(time_utc, lon_deg)
