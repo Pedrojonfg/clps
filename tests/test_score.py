@@ -1,12 +1,12 @@
 # S4 + P13: layer 0 surface minima zero the score; layer 1 is Φ-slack reliability R
-# times a bounded bonus (D-7af3, D-7520, D-6ce5); layer 2 hazard weights remain deferred.
+# times a bounded bonus (D-7af3, D-7520, D-6ce5, D-48ee); layer 2 hazard weights remain deferred.
 #
 # Reference formulas (tests recompute with math.erf):
 #   Φ(z)   = 0.5 * (1 + erf(z / sqrt(2)))
 #   p_i    = Φ(slack_i / σ_i), σ_night = 5, σ_lit = 5, σ_no_earth = 1 (hours)
 #   R      = Π p_i over active terms (night, no_earth, lit iff min_continuous_lit_h > 0)
 #   B      = Σ w x / Σ w, clip [0,1]; interval terms w=0.1, scalar terms w=1.0
-#   raw    = R (1 + 0.15 B); score = R * 1.30 if R > 0 and (raw - R)/R > 0.30 else raw
+#   raw    = R (1 + 0.25 B); score = R * 1.40 if R > 0 and (raw - R)/R > 0.40 else raw
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ OLD_FORMULA = "two_layer_zero_then_assurance_then_weights"
 SIGMA_NIGHT = 5.0
 SIGMA_LIT = 5.0
 SIGMA_NO_EARTH = 1.0
-BETA = 0.15
-MAX_UPLIFT = 0.30
+BETA = 0.25  # per D-20261115-pj-48ee
+MAX_UPLIFT = 0.40  # per D-20261115-pj-48ee
 
 
 def phi(z: float) -> float:
@@ -35,7 +35,7 @@ def _clip01(x: float) -> float:
 
 
 def expected_score(series: dict, needs: dict, n: int | None = None) -> tuple[float, float, float]:
-    """Return (score, R, B) per the D-7520 / D-6ce5 contract."""
+    """Return (score, R, B) per the D-7520 / D-6ce5 / D-48ee contract."""
     max_night = int(needs["max_night_h"])
     max_no_earth = int(needs["max_no_earth_h"])
     min_lit = int(needs.get("min_continuous_lit_h", 0))
@@ -130,9 +130,9 @@ def test_hand_computed_numeric_anchor() -> None:
     result = score(series=series, hazards={}, needs=needs)
     r = phi(2.0) * phi(10.0)
     b = (0.1 * 0.2 + 0.1 * 0.5 + 1.0 + 1.0) / 2.2
-    want = r * (1.0 + 0.15 * b)
+    want = r * (1.0 + BETA * b)
     assert result["score"] == pytest.approx(want, rel=1e-9)
-    assert result["score"] == pytest.approx(0.97725 * (1.0 + 0.15 * 0.94091), abs=1e-4)
+    assert result["score"] == pytest.approx(0.97725 * (1.0 + BETA * 0.94091), abs=1e-4)
 
 
 def test_missing_hours_counts_treated_as_zero() -> None:
@@ -165,7 +165,7 @@ def test_hours_scalars_raise_bonus_monotonically() -> None:
     assert _layer1(high)[0] == pytest.approx(_layer1(low)[0])
 
 
-def test_uplift_never_exceeds_thirty_percent_of_R() -> None:
+def test_uplift_never_exceeds_cap_fraction_of_R() -> None:
     series = {
         "longest_night_h": 0,
         "longest_no_earth_h": 0,
@@ -184,8 +184,8 @@ def test_uplift_never_exceeds_thirty_percent_of_R() -> None:
 
 
 def test_uplift_ratio_stays_within_cap_band() -> None:
-    # With β=0.15 and B<=1 the raw uplift is at most 15%, so the cap is a safety rail:
-    # score/R must always sit in [1, 1.30].
+    # With β=0.25 and B<=1 the raw uplift is at most 25%, so the 40% cap is a disaster rail:
+    # score/R must always sit in [1, 1.40].
     series = {
         "longest_night_h": 10,
         "longest_no_earth_h": 5,
@@ -450,7 +450,7 @@ def test_surface_fail_keeps_companion_from_slacks() -> None:
     assert result["companion_score"] == pytest.approx(want, rel=1e-9)
 
 
-def test_companion_uplift_capped_at_thirty_percent() -> None:
+def test_companion_uplift_stays_within_cap() -> None:
     series = {
         "longest_night_h": 51,
         "longest_no_earth_h": 20,
