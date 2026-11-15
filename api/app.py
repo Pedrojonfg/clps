@@ -28,6 +28,17 @@ def map_js() -> FileResponse:
     return FileResponse(WEB_DIR / "map.js", media_type="text/javascript")
 
 
+@app.get("/firstperson.html")
+def firstperson_page() -> FileResponse:
+    """S10 first-person Cesium view."""
+    return FileResponse(WEB_DIR / "firstperson.html")
+
+
+@app.get("/firstperson.js")
+def firstperson_js() -> FileResponse:
+    return FileResponse(WEB_DIR / "firstperson.js", media_type="text/javascript")
+
+
 app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="web-assets")
 
 
