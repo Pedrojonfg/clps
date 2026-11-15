@@ -322,6 +322,40 @@
         </div>
       </form>
 
+      <section class="deep-search" id="deep-search-panel" aria-labelledby="deep-heading">
+        <h2 id="deep-heading">Deep search</h2>
+        <p style="font-size:0.85rem;color:var(--ink-quiet)">Rect snapped to 1 km cap · provisional until night megatest (D-0ee7)</p>
+        <div class="planner-actions" style="flex-wrap:wrap;gap:0.5rem;margin:0.5rem 0">
+          <label>Mode
+            <select id="deep-mode">
+              <option value="optimized" selected>optimized (default)</option>
+              <option value="total_coverage">total_coverage</option>
+            </select>
+          </label>
+          <label>lat min <input id="deep-lat-min" type="number" step="any" value="-89.5" /></label>
+          <label>lat max <input id="deep-lat-max" type="number" step="any" value="-89.4" /></label>
+          <label>lon min <input id="deep-lon-min" type="number" step="any" value="222.4" /></label>
+          <label>lon max <input id="deep-lon-max" type="number" step="any" value="222.6" /></label>
+          <button type="button" class="primary" id="deep-run-btn">Run deep search</button>
+          <button type="button" id="deep-csv-btn" disabled>Download CSV</button>
+        </div>
+        <div id="deep-status" role="status"></div>
+        <table id="deep-search-table" aria-label="Deep search leaderboard" hidden>
+          <thead>
+            <tr>
+              <th>Pick</th>
+              <th>Lat</th>
+              <th>Lon</th>
+              <th>Start</th>
+              <th>Feasible</th>
+              <th>Score</th>
+              <th>Companion</th>
+            </tr>
+          </thead>
+          <tbody id="deep-search-body"></tbody>
+        </table>
+      </section>
+
       <section class="chart-panel" aria-labelledby="chart-heading">
         <h2 id="chart-heading" class="visually-hidden" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0)">
           Polar horizon sky chart
@@ -652,6 +686,114 @@
         }
       }
 
+      function renderDeepSearch(data) {
+        const table = document.getElementById("deep-search-table");
+        const body = document.getElementById("deep-search-body");
+        const status = document.getElementById("deep-status");
+        window.__lastDeep = data;
+        document.getElementById("deep-csv-btn").disabled = !(data?.export_rows?.length);
+        if (!data?.leaderboard?.length) {
+          table.hidden = true;
+          body.innerHTML = "";
+          status.textContent = data
+            ? `Deep: ${data.claim} · evaluated ${data.rows_evaluated} · ${Number(data.runtime_s).toFixed(1)}s · no rows`
+            : "";
+          return;
+        }
+        table.hidden = false;
+        status.textContent = `Deep: ${data.mode} / ${data.claim}${data.provisional ? " (provisional)" : ""} · sites ${data.n_sites} · evaluated ${data.rows_evaluated} · ${Number(data.runtime_s).toFixed(1)}s`;
+        const pick = data.best;
+        body.innerHTML = "";
+        data.leaderboard.forEach((r) => {
+          const tr = document.createElement("tr");
+          const isPick =
+            pick &&
+            r.window_start === pick.window_start &&
+            r.site?.lat_deg === pick.site?.lat_deg &&
+            r.site?.lon_deg === pick.site?.lon_deg;
+          if (isPick) tr.className = "pick-row";
+          tr.innerHTML = `
+            <td>${isPick ? "★" : ""}</td>
+            <td>${Number(r.site.lat_deg).toFixed(5)}</td>
+            <td>${Number(r.site.lon_deg).toFixed(5)}</td>
+            <td>${r.window_start ?? "—"}</td>
+            <td>${r.feasible ? "yes" : "no"}</td>
+            <td>${Number(r.score).toFixed(3)}</td>
+            <td>${Number(r.companion_score).toFixed(3)}</td>`;
+          body.appendChild(tr);
+        });
+      }
+
+      async function runDeepSearch(form) {
+        const status = document.getElementById("deep-status");
+        status.textContent = "Deep search running…";
+        const body = {
+          mode: document.getElementById("deep-mode").value,
+          lat_min: Number(document.getElementById("deep-lat-min").value),
+          lat_max: Number(document.getElementById("deep-lat-max").value),
+          lon_min: Number(document.getElementById("deep-lon-min").value),
+          lon_max: Number(document.getElementById("deep-lon-max").value),
+          start: toUtcIso(form.start.value),
+          end: toUtcIso(form.end.value),
+          window_hours: 24,
+          template_id: form.template_id.value || null,
+          hazards_enabled: false,
+          format: "json",
+        };
+        try {
+          const res = await fetch("/deep-search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            const msg = data.detail?.message || data.detail?.error || res.statusText;
+            throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+          }
+          renderDeepSearch(data);
+        } catch (e) {
+          status.textContent = "Deep error: " + e.message;
+          document.getElementById("deep-csv-btn").disabled = true;
+        }
+      }
+
+      function downloadDeepCsv() {
+        const data = window.__lastDeep;
+        if (!data?.export_rows?.length) return;
+        const fields = [
+          "lat_deg",
+          "lon_deg",
+          "window_start",
+          "window_hours",
+          "feasible",
+          "score",
+          "companion_score",
+          "hazard_gap_star",
+        ];
+        const lines = [fields.join(",")];
+        for (const r of data.export_rows) {
+          lines.push(
+            [
+              r.site.lat_deg,
+              r.site.lon_deg,
+              r.window_start,
+              r.window_hours,
+              r.feasible,
+              r.score,
+              r.companion_score,
+              r.hazard_gap_star,
+            ].join(",")
+          );
+        }
+        const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "deep-search-export.csv";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
       async function init() {
         const form = document.getElementById("planner-form");
         document.getElementById("demo-site-btn").addEventListener("click", () => {
@@ -665,6 +807,8 @@
         document.getElementById("hide-gap-stars")?.addEventListener("change", () => {
           if (window.__lastPayload) renderLocalSearch(window.__lastPayload);
         });
+        document.getElementById("deep-run-btn")?.addEventListener("click", () => runDeepSearch(form));
+        document.getElementById("deep-csv-btn")?.addEventListener("click", downloadDeepCsv);
         await loadTemplates(form);
         runPlanner(form);
       }
