@@ -25,6 +25,9 @@ const DEMO_ROWS = [
   { lat_deg: -89.5, lon_deg: 238.0, score: 0, feasible: false, companion_score: 0.12 },
 ];
 const DEMO_BEST = DEMO_ROWS[0];
+/** ?static=1 → browser demo without API: demo rows only, from the exported region-map JSON. */
+const STATIC = new URLSearchParams(location.search).get("static") === "1";
+if (STATIC) document.querySelector('a[href="/"]')?.remove();
 
 const statusEl = document.getElementById("status");
 const host = document.getElementById("canvas-host");
@@ -283,6 +286,7 @@ function readPlannerContext() {
 }
 
 function openSiteChart(sample) {
+  if (STATIC) return; // no standalone planner page in the browser demo
   const q = readPlannerContext();
   q.set("lat", String(sample.lat_deg));
   q.set("lon", String(sample.lon_deg));
@@ -293,6 +297,11 @@ function openSiteChart(sample) {
 }
 
 async function postRegionMap(body) {
+  if (STATIC) {
+    const res = await fetch("demo/region-map-demo.json");
+    if (!res.ok) throw new Error(`demo data HTTP ${res.status}`);
+    return res.json();
+  }
   const res = await fetch("/region-map", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -392,7 +401,7 @@ resize();
 window.addEventListener("resize", resize);
 tick();
 
-if (new URLSearchParams(location.search).get("demo") === "1") {
+if (STATIC || new URLSearchParams(location.search).get("demo") === "1") {
   loadDemo();
 } else {
   loadFromPlannerStorage();

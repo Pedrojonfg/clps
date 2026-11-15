@@ -10,7 +10,7 @@ import {
   InputGroup,
   Spinner,
 } from "@blueprintjs/core";
-import { fetchSite, fetchTemplates } from "../api";
+import { STATIC_DEMO, fetchSite, fetchTemplates } from "../api";
 import { PolarChart } from "../PolarChart";
 import { DEMO_SITE, MissionTemplate, PlannerForm, SitePayload } from "../types";
 
@@ -126,6 +126,18 @@ export function PlannerScreen({
         Polar sky chart: azimuth from north at top. Evaluator on this machine; remote role is
         horizon masks only.
       </p>
+      {STATIC_DEMO && (
+        <Callout intent="warning" title="Browser demo: mocked data" style={{ marginBottom: 12 }}>
+          There is no server behind this page. Every run returns the same sample result: a
+          mocked horizon and sample Sun/Earth tracks over 24 h, scored with fixed demo needs, so
+          changing the inputs does not change the result. For computed results, run lunar-eval
+          locally with the data —{" "}
+          <a href="https://github.com/Pedrojonfg/clps#try-it" target="_blank" rel="noreferrer">
+            see the README
+          </a>
+          .
+        </Callout>
+      )}
 
       <form onSubmit={runPlanner}>
         <div
@@ -250,7 +262,8 @@ export function PlannerScreen({
             onChange={(e) => setField("local_search", e.currentTarget.checked)}
           />
           <Checkbox
-            checked={form.mock}
+            checked={form.mock || STATIC_DEMO}
+            disabled={STATIC_DEMO}
             label="Mock data (demo)"
             onChange={(e) => setField("mock", e.currentTarget.checked)}
           />

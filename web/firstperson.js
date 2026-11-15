@@ -107,7 +107,9 @@
     const status = document.getElementById("load-status");
     const q = state.queryForSite;
     try {
-      const res = await fetch("/site?" + q);
+      // ?static=1 → browser demo without API: the exported mock payload.
+      const isStatic = new URLSearchParams(q).get("static") === "1";
+      const res = await fetch(isStatic ? "demo/site-mock.json" : "/site?" + q);
       const body = await res.json();
       if (!res.ok) {
         throw new Error(body.detail?.message || body.detail?.error || res.statusText);
@@ -487,6 +489,7 @@
   async function main() {
     const params = parseQuery();
     document.getElementById("back-link").href = "index.html?" + state.queryForBack;
+    if (params.get("static") === "1") document.getElementById("back-link").hidden = true;
 
     const data = await fetchSiteData();
     state.data = data;

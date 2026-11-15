@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button, Callout, Classes, Checkbox } from "@blueprintjs/core";
-import { regionMapUrl } from "../api";
+import { STATIC_DEMO, regionMapUrl } from "../api";
 import type { PlannerForm } from "../types";
 
 type Props = {
@@ -26,7 +26,8 @@ export function RegionMapScreen({ form }: Props) {
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <Checkbox
-          checked={demo}
+          checked={demo || STATIC_DEMO}
+          disabled={STATIC_DEMO}
           label="Demo region rows (?demo=1)"
           onChange={(e) => {
             setDemo(e.currentTarget.checked);
