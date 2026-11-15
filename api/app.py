@@ -4,14 +4,31 @@ import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from typing import Any
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="lunar-eval", version="0.2.0")
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 SCHEDULE_VERSION = "D-f369-v1"
+
+
+@app.get("/map.html")
+def map_page() -> FileResponse:
+    """S9 region map page. # per D-4126"""
+    return FileResponse(WEB_DIR / "map.html")
+
+
+@app.get("/map.js")
+def map_js() -> FileResponse:
+    return FileResponse(WEB_DIR / "map.js", media_type="text/javascript")
+
+
+app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="web-assets")
 
 
 def _mock_site_payload() -> dict:
@@ -91,9 +108,22 @@ def _mock_site_payload() -> dict:
     }
 
 
+class RegionMapBody(BaseModel):
+    rows: list[dict[str, Any]]
+    search_partial: bool
+    best: dict[str, Any] | None = None
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/region-map")
+def region_map(body: RegionMapBody) -> dict[str, Any]:
+    from lunar_eval.region_map import build_region_map
+
+    return build_region_map(body.rows, search_partial=body.search_partial, best=body.best)
 
 
 @app.get("/")

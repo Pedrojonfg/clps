@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Region score map — lunar south pole</title>
+  <!--
+    Moon texture: 2k_moon.jpg from Solar System Scope textures collection
+    (https://www.solarsystemscope.com/textures/) — free for use with attribution;
+  vendored at assets/moon.jpg (~1.1 MB). per D-4126 real Moon imagery, not a blank sphere.
+  -->
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0a0b0f;
+        color: #d8dce6;
+        overflow: hidden;
+      }
+      #toolbar {
+        position: absolute;
+        z-index: 2;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        align-items: center;
+        padding: 0.6rem 0.75rem;
+        background: rgba(10, 11, 15, 0.82);
+        border-bottom: 1px solid #3f4556;
+        font-size: 0.85rem;
+      }
+      #toolbar a { color: #c9a227; }
+      #toolbar button {
+        font: inherit;
+        cursor: pointer;
+        padding: 0.35rem 0.65rem;
+        border: 1px solid #5c6378;
+        background: #2a2e38;
+        color: inherit;
+        border-radius: 3px;
+      }
+      #toolbar button:hover { border-color: #c9a227; }
+      #status { flex: 1; color: #9aa2b4; min-width: 8rem; }
+      #status.err { color: #e88; }
+      #canvas-host {
+        position: fixed;
+        inset: 0;
+      }
+      #hint {
+        position: absolute;
+        bottom: 0.5rem;
+        left: 0.75rem;
+        z-index: 2;
+        font-size: 0.75rem;
+        color: #5c6378;
+        pointer-events: none;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header id="toolbar">
+      <a href="/">← Horizon planner</a>
+      <button type="button" id="load-demo">Load demo samples</button>
+      <span id="status">Drag to orbit · click a cell for site chart</span>
+    </header>
+    <div id="canvas-host" aria-label="Orbitable 3D Moon score map"></div>
+    <p id="hint">Scores from POST /region-map · D-834a lift shows solid sample colour</p>
+    <script type="module" src="map.js"></script>
+  </body>
+</html>
