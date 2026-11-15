@@ -20,8 +20,14 @@ data/kernels/
 data/masks/
 data/precompute/
 data/fixtures/
+data/hazards/
 
 # Isolated worktrees / agent scratch
 .worktrees/
 .superpowers/
+
+# Desktop (Tauri / Node) — local installs and build artifacts
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
 
