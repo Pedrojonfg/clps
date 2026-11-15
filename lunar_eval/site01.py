@@ -10,8 +10,13 @@ SITE01 = Site(lat_deg=DEMO_SITE01["lat_deg"], lon_deg=DEMO_SITE01["lon_deg"], ob
 
 
 def real_data_available() -> bool:
+    """True when Site01 DEM + kernels + spiceypy are usable (else real-path tests skip)."""
     from pathlib import Path
 
+    try:
+        import spiceypy  # noqa: F401
+    except ImportError:
+        return False
     root = Path(__file__).resolve().parents[1]
     return kernels_available() and (root / "data" / "dem" / "Site01_final_adj_5mpp_surf.tif").is_file()
 

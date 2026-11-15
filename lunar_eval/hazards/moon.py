@@ -67,6 +67,8 @@ class MoonHazards:
         return self.climatology.at_site_time(time_utc, site.lon_deg)
 
     def hazards(self, site: Site, times: NDArray[np.datetime64]) -> dict:
+        if isinstance(self.climatology, PolarPcpClimatology):
+            self.climatology.preload(times, site.lon_deg)
         psr = self._psr(site)
         slope_deg = self._slope_deg(site)
         resistance = soil_resistance(slope_deg)
@@ -102,3 +104,14 @@ def aggregate_hazards(hours: list[dict]) -> dict:
         "slope_deg": hours[0]["slope_deg"] if hours else 0.0,
         "psr": hours[0]["psr"] if hours else {"in_psr": False, "message": None},
     }
+
+
+_DEFAULT_MOON: MoonHazards | None = None
+
+
+def default_moon_hazards() -> MoonHazards:
+    """Process-wide MoonHazards so PCP bin caches survive across /site calls."""
+    global _DEFAULT_MOON
+    if _DEFAULT_MOON is None:
+        _DEFAULT_MOON = MoonHazards()
+    return _DEFAULT_MOON
