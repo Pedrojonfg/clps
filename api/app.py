@@ -5,7 +5,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="lunar-eval", version="0.2.0")
 
@@ -184,3 +185,198 @@ def site(
             status_code=503,
             detail={"error": "planner_failed", "message": str(e)},
         ) from e
+
+
+class DeepSearchBody(BaseModel):
+    """POST /deep-search body. # per D-60a3 D-c159 D-54f0"""
+
+    mode: str = Field(default="optimized")
+    lat_min: float
+    lat_max: float
+    lon_min: float
+    lon_max: float
+    start: str
+    end: str
+    window_hours: int = Field(default=24, ge=1, le=168)
+    template_id: str | None = None
+    start_n: int | None = None
+    hazards_enabled: bool = False
+    format: str = Field(default="json", description="json | csv")
+
+
+def _iso_row(row: dict | None) -> dict | None:
+    if row is None:
+        return None
+    out = dict(row)
+    import numpy as np
+
+    out["window_start"] = str(np.datetime64(row["window_start"], "s")) + "Z"
+    return out
+
+
+@app.post("/deep-search")
+def deep_search_endpoint(body: DeepSearchBody):
+    # per D-60a3 dedicated endpoint; D-54f0 modes; D-c159 rect snap
+    from lunar_eval.ephemeris import SpiceEphemeris
+    from lunar_eval.horizon.cap_index import (
+        cap_index_available,
+        mask_from_cap_tile,
+        sites_in_latlon_rect,
+    )
+    from lunar_eval.planner_payload import kernels_available, parse_time_window
+    from lunar_eval.planner_templates import template_needs
+    from lunar_eval.search.deep import DEFAULT_LEADERBOARD_N, DEFAULT_TMAX_S, deep_search
+    from lunar_eval.visibility import series as vis_series
+
+    if not kernels_available():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk"},
+        )
+    if not cap_index_available():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "cap_missing", "message": "1 km cap index not on disk"},
+        )
+
+    tpl = template_needs(body.template_id)
+    if tpl:
+        needs = {
+            "max_night_h": int(tpl["max_night_h"]),
+            "max_no_earth_h": int(tpl["max_no_earth_h"]),
+            "require_both": bool(tpl["require_both"]),
+            "min_continuous_lit_h": int(tpl.get("min_continuous_lit_h", 0)),
+        }
+        sun_pct = float(tpl["sun_lit_percent"])
+        earth_pct = float(tpl["earth_lit_percent"])
+        bridge = int(tpl["bridge_h"])
+    else:
+        needs = {
+            "max_night_h": 72,
+            "max_no_earth_h": 48,
+            "require_both": False,
+            "min_continuous_lit_h": 0,
+        }
+        sun_pct, earth_pct, bridge = 0.0, 0.0, 5
+
+    cells = sites_in_latlon_rect(body.lat_min, body.lat_max, body.lon_min, body.lon_max)
+    if not cells:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "empty_rect", "message": "No cap cells in rectangle"},
+        )
+
+    try:
+        span = parse_time_window(body.start, body.end, step_h=1)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": "bad_time", "message": str(e)}) from e
+
+    # Window starts: hours where a full window_hours block fits in span.
+    wh = int(body.window_hours)
+    if len(span) < wh + 1:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "time_too_short", "message": "end-start must cover window_hours"},
+        )
+    import numpy as np
+
+    n_starts = len(span) - wh
+    starts = span[:n_starts]
+    sites = [c[0] for c in cells]
+    site_xy = [(c[1], c[2]) for c in cells]
+
+    eph = SpiceEphemeris()
+    sun_thr = max(0.0, min(100.0, sun_pct)) / 100.0
+    earth_thr = max(0.0, min(100.0, earth_pct)) / 100.0
+    sky_by_site: dict[int, list] = {}
+
+    def evaluate(candidate, start, hours: int) -> dict:
+        idx = None
+        for i, s in enumerate(sites):
+            if s.lat_deg == candidate.lat_deg and s.lon_deg == candidate.lon_deg:
+                idx = i
+                break
+        if idx is None:
+            raise ValueError("site not in rect cells")
+        _site, _x, _y, tx, ty, row = cells[idx]
+        horizon = mask_from_cap_tile(tx, ty, row)
+        if idx not in sky_by_site:
+            sky_by_site[idx] = eph.sky(candidate, span)
+        t0 = np.datetime64(start, "s")
+        i0 = int((t0 - np.datetime64(span[0], "s")) / np.timedelta64(1, "h"))
+        sky_win = sky_by_site[idx][i0 : i0 + int(hours) + 1]
+        vis = vis_series(
+            sky_win,
+            horizon,
+            sun_threshold=sun_thr,
+            earth_threshold=earth_thr,
+            bridge_h=bridge,
+        )
+        return {"series": vis, "hazards": {}, "hazard_gap_star": False}
+
+    try:
+        result = deep_search(
+            sites,
+            starts,
+            wh,
+            needs,
+            evaluate=evaluate,
+            mode=body.mode,
+            start_n=body.start_n,
+            tmax_s=DEFAULT_TMAX_S,
+            leaderboard_n=DEFAULT_LEADERBOARD_N,
+            site_xy=site_xy,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": "deep_failed", "message": str(e)}) from e
+
+    export = result.get("export_rows") or result["leaderboard"]
+    payload = {
+        "mode": result["mode"],
+        "claim": result["claim"],
+        "best": _iso_row(result["best"]),
+        "leaderboard": [_iso_row(r) for r in result["leaderboard"]],
+        "export_rows": [_iso_row(r) for r in export],
+        "rows_evaluated": result["rows_evaluated"],
+        "runtime_s": result["runtime_s"],
+        "eta_s": result["eta_s"],
+        "n_starts": result["n_starts"],
+        "n_sites": len(sites),
+        "n_window_starts": int(n_starts),
+        "provisional": True,  # per D-0ee7 until megatest
+    }
+
+    if body.format == "csv":
+        import csv
+        import io
+
+        buf = io.StringIO()
+        fields = [
+            "lat_deg",
+            "lon_deg",
+            "window_start",
+            "window_hours",
+            "feasible",
+            "score",
+            "companion_score",
+            "hazard_gap_star",
+        ]
+        w = csv.DictWriter(buf, fieldnames=fields)
+        w.writeheader()
+        for r in export:
+            w.writerow(
+                {
+                    "lat_deg": r["site"]["lat_deg"],
+                    "lon_deg": r["site"]["lon_deg"],
+                    "window_start": str(np.datetime64(r["window_start"], "s")) + "Z",
+                    "window_hours": r["window_hours"],
+                    "feasible": r["feasible"],
+                    "score": r["score"],
+                    "companion_score": r["companion_score"],
+                    "hazard_gap_star": r["hazard_gap_star"],
+                }
+            )
+        return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+
+    return payload
+
