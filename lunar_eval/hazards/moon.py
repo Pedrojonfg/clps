@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from lunar_eval.hazards.lst import local_solar_time_h_from_utc
 from lunar_eval.hazards.pcp import PolarPcpClimatology
 from lunar_eval.hazards.raster import sample_geotiff
-from lunar_eval.hazards.soil import soil_resistance
+from lunar_eval.hazards.soil import soil_provenance, soil_resistance
 from lunar_eval.hazards.temperature import ClimatologyTable, RasterClimatology
 from lunar_eval.providers import Site
 
@@ -82,9 +82,8 @@ class MoonHazards:
                     "provenance": {
                         "temperature": temp_prov,
                         "soil_resistance": {
+                            **soil_provenance(slope_deg),
                             "label": self.soil_label,
-                            "slope_deg": slope_deg,
-                            "metzger_slope_factor": "deferred",
                         },
                         "psr": {"product": "LPSR_80S_20MPP_ADJ", **psr},
                     },

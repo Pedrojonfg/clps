@@ -25,10 +25,12 @@ def test_quadrant_idw_fills_centre_from_neighbors() -> None:
     assert val == pytest.approx(25.0)
 
 
-def test_soil_resistance_increases_with_slope() -> None:
+def test_soil_resistance_decreases_with_slope_metzger_beta() -> None:
+    # D-06cb: R = ρgD·cos(θ)+α → steeper slope lowers the grain term
     flat = soil_resistance(0.0)
     steep = soil_resistance(45.0)
-    assert steep > flat
+    assert steep < flat
+    assert flat == pytest.approx(1500.0 * 1.62 * 70e-6 * 1.0 + 500.0)
 
 
 def test_climatology_lookup_by_lst_bin() -> None:
@@ -50,6 +52,9 @@ def test_moon_hazards_returns_hourly_contract() -> None:
     h0 = out["hours"][0]
     assert set(h0) >= {"temperature_k", "soil_resistance", "slope_deg", "psr", "provenance"}
     assert out["aggregate"]["temperature_k"] == 250.0
+    dust = h0["provenance"]["soil_resistance"]
+    assert dust["metzger_slope_factor"] == "cos_theta_on_grain_term_only"
+    assert dust["label"] == "soil_erodibility_resistance_not_lofting_rate"
 
 
 def test_score_uses_worst_temperature_across_hours() -> None:
