@@ -60,7 +60,7 @@ def build_planner_payload(
     local_search: bool = False,
 ) -> dict:
     from lunar_eval.ephemeris import SpiceEphemeris
-    from lunar_eval.hazards import ConstantHazards, MoonHazards
+    from lunar_eval.hazards import ConstantHazards, default_moon_hazards
     from lunar_eval.score import score
     from lunar_eval.visibility import series
 
@@ -77,7 +77,7 @@ def build_planner_payload(
         bridge_h=int(bridge_h),
     )
 
-    hazard_provider = MoonHazards() if hazards_enabled else ConstantHazards()
+    hazard_provider = default_moon_hazards() if hazards_enabled else ConstantHazards()
     raw_hz = hazard_provider.hazards(site, times)
     hazards_payload = raw_hz if hazards_enabled else {}
 

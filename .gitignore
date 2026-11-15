@@ -21,13 +21,18 @@ data/masks/
 data/precompute/
 data/fixtures/
 data/hazards/
+data/megatest_deep_search_last.json
 
 # Isolated worktrees / agent scratch
 .worktrees/
 .superpowers/
 
+# Remotion demo video
+video/node_modules/
+video/out/
+video/dist/
+
 # Desktop (Tauri / Node) — local installs and build artifacts
 desktop/node_modules/
 desktop/dist/
 desktop/src-tauri/target/
-

@@ -18,7 +18,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx"]
+# spiceypy also listed under sky for callers that only need ephemeris.
+dev = ["pytest", "httpx", "spiceypy"]
 sky = ["spiceypy"]
 
 [tool.setuptools.packages.find]
