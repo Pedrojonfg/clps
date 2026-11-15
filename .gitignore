@@ -26,3 +26,8 @@ data/hazards/
 .worktrees/
 .superpowers/
 
+# Desktop (Tauri / Node) — local installs and build artifacts
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+
