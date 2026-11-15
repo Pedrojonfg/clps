@@ -16,7 +16,18 @@ export default defineConfig(() => ({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    host: host || "0.0.0.0",
+    proxy: {
+      "/site": "http://127.0.0.1:8000",
+      "/mission-templates": "http://127.0.0.1:8000",
+      "/deep-search": "http://127.0.0.1:8000",
+      "/region-map": "http://127.0.0.1:8000",
+      "/map.html": "http://127.0.0.1:8000",
+      "/map.js": "http://127.0.0.1:8000",
+      "/firstperson.html": "http://127.0.0.1:8000",
+      "/firstperson.js": "http://127.0.0.1:8000",
+      "/assets": "http://127.0.0.1:8000",
+    },
     hmr: host
       ? {
           protocol: "ws",
