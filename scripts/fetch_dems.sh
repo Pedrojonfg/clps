@@ -20,4 +20,6 @@ fetch "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDEM_80S_40MPP_ADJ.TIF" "LDEM_
 fetch "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDEM_80S_20MPP_ADJ.TIF" "LDEM_80S_20MPP_ADJ.TIF"
 fetch "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDEM_83S_10MPP_ADJ.TIF" "LDEM_83S_10MPP_ADJ.TIF"
 fetch "https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/87S/ldem_87s_5mpp.tif" "ldem_87s_5mpp.tif"
+fetch "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDSM_80S_80MPP_ADJ.TIF" "LDSM_80S_80MPP_ADJ.TIF"
+fetch "https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LPSR_80S_20MPP_ADJ.TIF" "LPSR_80S_20MPP_ADJ.TIF"
 echo "done"

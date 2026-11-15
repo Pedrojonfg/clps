@@ -20,6 +20,7 @@ data/kernels/
 data/masks/
 data/precompute/
 data/fixtures/
+data/hazards/
 
 # Isolated worktrees / agent scratch
 .worktrees/
