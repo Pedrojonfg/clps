@@ -8,8 +8,6 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.spatial import cKDTree
-
 from lunar_eval.hazards.lst import lst_bin_index, local_solar_time_h_from_utc
 from lunar_eval.horizon.mask import R_M
 
@@ -22,8 +20,15 @@ def default_pcp_root() -> Path:
     return Path(__file__).resolve().parents[2] / "data" / "hazards" / "pcp"
 
 
+_SEASON_BY_DAY: dict[str, str] = {}
+
+
 def _south_season(time_utc: np.datetime64) -> str:
     """Williams et al. 2019: south summer when subsolar latitude < 0."""
+    day = str(np.datetime64(time_utc, "D"))
+    cached = _SEASON_BY_DAY.get(day)
+    if cached is not None:
+        return cached
     try:
         import spiceypy as spice
         from lunar_eval.ephemeris.spice import KERNEL_DIR, _furnsh
@@ -34,14 +39,19 @@ def _south_season(time_utc: np.datetime64) -> str:
         pos, _ = spice.spkpos("SUN", et, "MOON_ME", "LT+S", "MOON")
         r = math.sqrt(float(pos[0]) ** 2 + float(pos[1]) ** 2 + float(pos[2]) ** 2)
         lat = math.degrees(math.asin(float(pos[2]) / r))
-        return "summer" if lat < 0.0 else "winter"
+        season = "summer" if lat < 0.0 else "winter"
     except Exception:
-        return "summer"
+        season = "summer"
+    _SEASON_BY_DAY[day] = season
+    return season
 
 
 @dataclass
 class _BinCache:
-    tree: cKDTree
+    """Raw stereo points (normalized by R_M). No KDTree — build was ~4s/bin on ~3M pts."""
+
+    x: NDArray[np.float64]
+    y: NDArray[np.float64]
     tbol: NDArray[np.float32]
 
 
@@ -52,11 +62,30 @@ class PolarPcpClimatology:
     root: Path = field(default_factory=default_pcp_root)
     product: str = PRODUCT_ID
     _cache: dict[tuple[str, int], _BinCache] = field(default_factory=dict, repr=False)
+    _value_cache: dict[tuple[str, int, float, float], tuple[float | None, dict]] = field(
+        default_factory=dict, repr=False
+    )
 
     def available(self) -> bool:
         summer = self.root / "summer"
         winter = self.root / "winter"
         return any(p.is_dir() and any(p.glob("ltim*.npz")) for p in (summer, winter))
+
+    def preload(self, times: NDArray[np.datetime64], lon_deg: float) -> None:
+        """Load unique season/LST bins for a window (threaded) before hourly lookups."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        keys: set[tuple[str, int]] = set()
+        for time_utc in np.asarray(times):
+            season = _south_season(time_utc)
+            bin_1 = lst_bin_index(local_solar_time_h_from_utc(time_utc, lon_deg)) + 1
+            keys.add((season, bin_1))
+        missing = [k for k in keys if k not in self._cache]
+        if not missing:
+            return
+        workers = min(8, len(missing))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            list(pool.map(lambda k: self._load_bin(k[0], k[1]), missing))
 
     def _load_bin(self, season: str, bin_1based: int) -> _BinCache | None:
         key = (season, bin_1based)
@@ -74,7 +103,7 @@ class PolarPcpClimatology:
             x = np.asarray(z["x"], dtype=np.float64)
             y = np.asarray(z["y"], dtype=np.float64)
             tbol = np.asarray(z["tbol"], dtype=np.float32)
-        cache = _BinCache(tree=cKDTree(np.column_stack([x, y])), tbol=tbol)
+        cache = _BinCache(x=x, y=y, tbol=tbol)
         self._cache[key] = cache
         return cache
 
@@ -87,6 +116,18 @@ class PolarPcpClimatology:
         lst = local_solar_time_h_from_utc(time_utc, lon_deg)
         bin0 = lst_bin_index(lst)
         bin_1 = bin0 + 1
+        value_key = (season, bin_1, float(lat_deg), float(lon_deg))
+        hit = self._value_cache.get(value_key)
+        if hit is not None:
+            temp, base_meta = hit
+            meta = {
+                **base_meta,
+                "lst_h": lst,
+                "lst_bin": bin0,
+                "season": season,
+            }
+            return temp, meta
+
         meta: dict = {
             "lst_h": lst,
             "lst_bin": bin0,
@@ -98,6 +139,7 @@ class PolarPcpClimatology:
         cache = self._load_bin(season, bin_1)
         if cache is None:
             meta["status"] = "missing_pcp_bin"
+            self._value_cache[value_key] = (None, dict(meta))
             return None, meta
 
         x_m, y_m = polar_stereo_xy(lat_deg, lon_deg)
@@ -105,42 +147,50 @@ class PolarPcpClimatology:
         step = PIXEL_M / R_M
         max_r = MAX_FILL_PX * step
 
-        dist, idx = cache.tree.query([xn, yn], k=1)
-        dist = float(dist)
+        dx = cache.x - xn
+        dy = cache.y - yn
+        d2 = dx * dx + dy * dy
+        idx = int(np.argmin(d2))
+        dist = float(math.sqrt(float(d2[idx])))
         if dist <= step * 0.75:
             meta["fill"] = "none"
-            return float(cache.tbol[int(idx)]), meta
+            temp = float(cache.tbol[idx])
+            self._value_cache[value_key] = (temp, dict(meta))
+            return temp, meta
 
         # Four-quadrant inverse-distance among points inside the search radius.
-        idxs = cache.tree.query_ball_point([xn, yn], r=max_r)
-        if not idxs:
+        near = d2 <= max_r * max_r
+        if not np.any(near):
             meta["fill"] = "none"
             meta["status"] = "no_points_in_radius"
+            self._value_cache[value_key] = (None, dict(meta))
             return None, meta
-        pts = cache.tree.data[idxs]
-        temps = cache.tbol[idxs]
-        dx = pts[:, 0] - xn
-        dy = pts[:, 1] - yn
+        dx_n = dx[near]
+        dy_n = dy[near]
+        temps = cache.tbol[near]
         quarters = (
-            (dy <= 0) & (dx <= 0),
-            (dy <= 0) & (dx > 0),
-            (dy > 0) & (dx > 0),
-            (dy > 0) & (dx <= 0),
+            (dy_n <= 0) & (dx_n <= 0),
+            (dy_n <= 0) & (dx_n > 0),
+            (dy_n > 0) & (dx_n > 0),
+            (dy_n > 0) & (dx_n <= 0),
         )
         picks: list[tuple[float, float]] = []
         for mask in quarters:
             if not np.any(mask):
                 continue
-            d = np.hypot(dx[mask], dy[mask])
+            d = np.hypot(dx_n[mask], dy_n[mask])
             j = int(np.argmin(d))
             dj = float(d[j])
             if dj <= 0:
                 meta["fill"] = "none"
-                return float(temps[mask][j]), meta
+                temp = float(temps[mask][j])
+                self._value_cache[value_key] = (temp, dict(meta))
+                return temp, meta
             picks.append((float(temps[mask][j]), dj))
         if not picks:
             meta["fill"] = "none"
             meta["status"] = "unfilled"
+            self._value_cache[value_key] = (None, dict(meta))
             return None, meta
         wsum = sum(1.0 / d for _, d in picks)
         value = sum(v / d for v, d in picks) / wsum
@@ -151,4 +201,6 @@ class PolarPcpClimatology:
                 "n_quadrants_used": len(picks),
             }
         )
-        return float(value), meta
+        temp = float(value)
+        self._value_cache[value_key] = (temp, dict(meta))
+        return temp, meta

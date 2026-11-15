@@ -23,10 +23,11 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from lunar_eval.ephemeris import SpiceEphemeris  # noqa: E402
+from lunar_eval.horizon import polar_stereo_xy  # noqa: E402
 from lunar_eval.horizon.cap_index import (  # noqa: E402
     cap_index_available,
     mask_from_cap_tile,
-    sites_in_latlon_rect,
+    sites_in_xy_rect,
 )
 from lunar_eval.planner_payload import kernels_available  # noqa: E402
 from lunar_eval.planner_templates import TEMPLATES  # noqa: E402
@@ -45,17 +46,18 @@ def main() -> int:
         print("kernels or cap_1km missing", file=sys.stderr)
         return 1
 
-    # Medium band ~50 km: ~0.45 deg lat near pole is not km; use stereo ~25 km half-width via lon/lat pad.
+    # Stereo metres near the pole (lat/lon pads collapse E–W). Quick ≈10×10 km; medium ≈50×50 km.
     if args.quick:
-        dlat, dlon = 0.05, 0.15
-        days = 2
+        half_m, days = 5_000.0, 2
     else:
-        dlat, dlon = 0.15, 0.8  # rough ~ tens of km near Site01
-        days = 7
+        half_m, days = 25_000.0, 7
 
-    lat0, lon0 = SITE01.lat_deg, SITE01.lon_deg
-    cells = sites_in_latlon_rect(lat0 - dlat, lat0 + dlat, lon0 - dlon, lon0 + dlon)
-    print(f"cells_in_rect={len(cells)} quick={args.quick}", flush=True)
+    sx, sy = polar_stereo_xy(SITE01.lat_deg, SITE01.lon_deg)
+    cells = sites_in_xy_rect(sx - half_m, sx + half_m, sy - half_m, sy + half_m)
+    print(
+        f"cells_in_rect={len(cells)} quick={args.quick} half_m={half_m} center_xy=({sx:.1f},{sy:.1f})",
+        flush=True,
+    )
     if len(cells) < 5:
         print("rect too empty", file=sys.stderr)
         return 1
@@ -130,21 +132,41 @@ def main() -> int:
         tmax_s=DEFAULT_TMAX_S,
         site_xy=site_xy,
     )
-    match = False
+    match_site = False
+    match_score = False
     if cov["best"] and opt["best"]:
-        match = (
+        match_site = (
             abs(cov["best"]["site"]["lat_deg"] - opt["best"]["site"]["lat_deg"]) < 1e-9
             and abs(cov["best"]["site"]["lon_deg"] - opt["best"]["site"]["lon_deg"]) < 1e-9
             and str(cov["best"]["window_start"]) == str(opt["best"]["window_start"])
         )
+        match_score = abs(float(cov["best"]["score"]) - float(opt["best"]["score"])) < 1e-9
+        summary["coverage_best"] = {
+            "lat_deg": cov["best"]["site"]["lat_deg"],
+            "lon_deg": cov["best"]["site"]["lon_deg"],
+            "window_start": str(cov["best"]["window_start"]),
+            "score": cov["best"]["score"],
+        }
+        summary["optimized_best"] = {
+            "lat_deg": opt["best"]["site"]["lat_deg"],
+            "lon_deg": opt["best"]["site"]["lon_deg"],
+            "window_start": str(opt["best"]["window_start"]),
+            "score": opt["best"]["score"],
+        }
     summary["optimized"] = {
         "runtime_s": opt["runtime_s"],
         "rows_evaluated": opt["rows_evaluated"],
         "n_starts": opt["n_starts"],
         "best_score": None if opt["best"] is None else opt["best"]["score"],
-        "matches_coverage_best": match,
+        "matches_coverage_best": match_site,
+        "matches_coverage_score": match_score,
     }
     print(json.dumps(summary["optimized"], indent=2), flush=True)
+    if match_score and not match_site:
+        print(
+            "note: same best score, different site/window (ties expected on flat plateaus)",
+            flush=True,
+        )
 
     out = REPO / "data" / "megatest_deep_search_last.json"
     out.parent.mkdir(parents=True, exist_ok=True)

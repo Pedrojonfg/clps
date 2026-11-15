@@ -25,7 +25,44 @@ def cap_index_available() -> bool:
 def _load_index():
     import pyarrow.parquet as pq
 
-    return pq.read_table(_INDEX).to_pandas()
+    # Keep as pyarrow Table (no pandas) so cap queries work with project deps only.
+    return pq.read_table(_INDEX)
+
+
+def sites_in_xy_rect(
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+) -> list[tuple[Site, float, float, int, int, int]]:
+    """Return (site, x_m, y_m, tile_x, tile_y, row) snapped cells in stereo AABB. # per D-c159"""
+    if not cap_index_available():
+        return []
+    table = _load_index()
+    x0, x1 = sorted((float(x_min), float(x_max)))
+    y0, y1 = sorted((float(y_min), float(y_max)))
+    x_m = table.column("x_m").to_numpy()
+    y_m = table.column("y_m").to_numpy()
+    lat = table.column("lat").to_numpy()
+    lon = table.column("lon").to_numpy()
+    tile_x = table.column("tile_x").to_numpy()
+    tile_y = table.column("tile_y").to_numpy()
+    row = table.column("row").to_numpy()
+    mask = (x_m >= x0) & (x_m <= x1) & (y_m >= y0) & (y_m <= y1)
+    out: list[tuple[Site, float, float, int, int, int]] = []
+    for i in np.flatnonzero(mask):
+        site = Site(lat_deg=float(lat[i]), lon_deg=float(lon[i]), observer_height_m=2.0)
+        out.append(
+            (
+                site,
+                float(x_m[i]),
+                float(y_m[i]),
+                int(tile_x[i]),
+                int(tile_y[i]),
+                int(row[i]),
+            )
+        )
+    return out
 
 
 def sites_in_latlon_rect(
@@ -34,10 +71,7 @@ def sites_in_latlon_rect(
     lon_min: float,
     lon_max: float,
 ) -> list[tuple[Site, float, float, int, int, int]]:
-    """Return (site, x_m, y_m, tile_x, tile_y, row) snapped cells in bbox. # per D-c159"""
-    if not cap_index_available():
-        return []
-    df = _load_index()
+    """Return cells in lat/lon box via stereo AABB of corners (polar lon wrap soft). # per D-c159"""
     lo_lat, hi_lat = sorted((float(lat_min), float(lat_max)))
     lo_lon, hi_lon = sorted((float(lon_min), float(lon_max)))
     # Stereo AABB from corners (and mid-edges) so polar lon wrap is less wrong.
@@ -52,24 +86,8 @@ def sites_in_latlon_rect(
         (hi_lat, (lo_lon + hi_lon) / 2),
     ]
     xs, ys = zip(*(polar_stereo_xy(la, lo) for la, lo in corners))
-    x0, x1 = min(xs), max(xs)
-    y0, y1 = min(ys), max(ys)
-    hit = df[(df["x_m"] >= x0) & (df["x_m"] <= x1) & (df["y_m"] >= y0) & (df["y_m"] <= y1)]
-    hit = hit[(hit["lat"] >= lo_lat) & (hit["lat"] <= hi_lat)]
-    out: list[tuple[Site, float, float, int, int, int]] = []
-    for r in hit.itertuples(index=False):
-        site = Site(lat_deg=float(r.lat), lon_deg=float(r.lon), observer_height_m=2.0)
-        out.append(
-            (
-                site,
-                float(r.x_m),
-                float(r.y_m),
-                int(r.tile_x),
-                int(r.tile_y),
-                int(r.row),
-            )
-        )
-    return out
+    hit = sites_in_xy_rect(min(xs), max(xs), min(ys), max(ys))
+    return [c for c in hit if lo_lat <= c[0].lat_deg <= hi_lat]
 
 
 @lru_cache(maxsize=64)
