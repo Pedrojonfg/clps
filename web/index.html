@@ -238,6 +238,22 @@
         line-height: 1.5;
       }
 
+      details.provenance-details {
+        margin-top: 0.35rem;
+        font-size: 0.7rem;
+        color: var(--frost-dim);
+      }
+
+      details.provenance-details summary {
+        cursor: pointer;
+        color: var(--ink-quiet);
+      }
+
+      details.provenance-details ul {
+        margin: 0.35rem 0 0;
+        padding-left: 1.1rem;
+      }
+
       footer {
         margin-top: 2rem;
         padding-top: 1rem;
@@ -320,6 +336,8 @@
           <button type="submit" class="primary">Run planner</button>
           <button type="button" id="demo-site-btn">Demo site (PGDA Site01)</button>
           <a href="map.html" style="align-self: center; font-size: 0.85rem; color: var(--gold-graze)">Region score map</a>
+          <!-- per D-e062: first-person shares site/time query with S8 -->
+          <a class="primary" id="firstperson-link" href="firstperson.html" style="display:inline-block;text-decoration:none;padding:0.45rem 0.85rem;border-radius:0.25rem">First-person view</a>
         </div>
       </form>
 
@@ -385,6 +403,10 @@
           <p class="score-val" id="score-display">—</p>
           <dl id="series-dl"></dl>
           <p class="provenance" id="provenance"></p>
+          <details class="provenance-details" id="provenance-details">
+            <summary>Details / Provenance</summary>
+            <ul id="provenance-list"></ul>
+          </details>
         </div>
         <div class="local-search" id="local-search-panel" hidden>
           <h2>Local search</h2>
@@ -558,9 +580,28 @@
           <dt>Any sun ∧ Earth</dt><dd>${ser.any_both ? "yes" : "no"}</dd>
         `;
 
-        const prov = sc.provenance;
+        const prov = sc.provenance || {};
+        const maskClaim = data.data_source === "real" ? "mask: computed/cached" : "mask: mocked";
         document.getElementById("provenance").textContent =
-          `Formula: ${prov.score_formula} · schedule ${prov.schedule_version}`;
+          `${maskClaim} · Formula: ${prov.score_formula ?? "—"} · schedule ${prov.schedule_version ?? "n/a"}`;
+        const items = [];
+        if (prov.decisions?.length) items.push(`Decisions: ${prov.decisions.join(", ")}`);
+        if (prov.sigmas_h) {
+          items.push(
+            `Sigmas (h): night ${prov.sigmas_h.night}, lit ${prov.sigmas_h.lit}, no_earth ${prov.sigmas_h.no_earth}`,
+          );
+        }
+        const hz = data.hazards?.hours?.[0]?.provenance || data.hazards?.aggregate?.provenance;
+        const dust = hz?.soil_resistance || data.hazards?.hours?.[0]?.provenance?.soil_resistance;
+        if (dust?.label) {
+          items.push(
+            `Dust: ${dust.label}` +
+              (dust.metzger_slope_factor ? ` · β=${dust.metzger_slope_factor}` : ""),
+          );
+        }
+        if (data.local_search) items.push("Local search: see leaderboard (provisional deep-search claims: D-0ee7)");
+        const ul = document.getElementById("provenance-list");
+        ul.innerHTML = items.map((t) => `<li>${t}</li>`).join("") || "<li>No extra provenance in payload.</li>";
 
         renderLocalSearch(data);
       }
@@ -675,9 +716,11 @@
             lede.textContent =
               "Polar sky chart: azimuth from north at top. Mask on disk; Sun/Earth computed on request.";
             foot.textContent =
-              "Provenance: SpiceyPy, DE440, PGDA LOLA DEMs. Not affiliated with or endorsed by NASA.";
+              "SpiceyPy · DE440 · PGDA LOLA — not affiliated with or endorsed by NASA. Challenge text is heritage inspiration only.";
           } else {
             tag.textContent = "Mock";
+            foot.textContent =
+              "Demo may use mocked masks — not affiliated with or endorsed by NASA. Challenge text is heritage inspiration only.";
           }
           window.__lastPayload = body;
           drawPolarChart(body);
@@ -795,22 +838,31 @@
         URL.revokeObjectURL(a.href);
       }
 
+      function syncFirstpersonLink(form) {
+        const a = document.getElementById("firstperson-link");
+        if (a) a.href = "firstperson.html?" + buildQuery(form);
+      }
+
       async function init() {
         const form = document.getElementById("planner-form");
         document.getElementById("demo-site-btn").addEventListener("click", () => {
           form.lat.value = "-89.46316";
           form.lon.value = "222.51045";
+          syncFirstpersonLink(form);
         });
         form.addEventListener("submit", (ev) => {
           ev.preventDefault();
+          syncFirstpersonLink(form);
           runPlanner(form);
         });
+        form.addEventListener("change", () => syncFirstpersonLink(form));
         document.getElementById("hide-gap-stars")?.addEventListener("change", () => {
           if (window.__lastPayload) renderLocalSearch(window.__lastPayload);
         });
         document.getElementById("deep-run-btn")?.addEventListener("click", () => runDeepSearch(form));
         document.getElementById("deep-csv-btn")?.addEventListener("click", downloadDeepCsv);
         await loadTemplates(form);
+        syncFirstpersonLink(form);
         runPlanner(form);
       }
 

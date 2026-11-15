@@ -1,101 +1,83 @@
-# CLPS / lunar site×time evaluator (portfolio)
+# Lunar site×time evaluator (portfolio)
 
-Solo portfolio project inspired by the NASA Space Apps Challenge 2026 brief **[CLPS Lunar Mission Browser](https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/)**. Not a contest team entry.
+Solo portfolio project inspired by the NASA Space Apps Challenge 2026 brief
+**[CLPS Lunar Mission Browser](https://www.spaceappschallenge.org/2026/challenges/clps-lunar-mission-browser/)**.
+The challenge text is **heritage inspiration only** — this is **not** a contest
+submission and is **not affiliated with or endorsed by NASA** (`D-7e2a`, `D-6663`).
 
-This repository holds **product definition** (decision records + learning notes). Application code is not started yet. Engine/method decisions (score formula, search algorithms, data pipeline, layer-B models) are **deferred** to a future decision ledger.
+## What this is
 
-## Challenge heritage (what NASA asked)
+A **needs-adapted site×time landing evaluator** for the lunar south pole:
+horizon masks + Sun/Earth geometry → visibility series → score (fail-closed on
+planner minima) → local / deep search, with surface hazards (temperature,
+soil-resistance “dust” proxy) and a web demo.
 
-South-pole missions face extreme **lighting** and **communication** constraints. Existing tools (e.g. Quickmap, Moon Trek, JPL Horizons) can answer where the Sun and Earth sit relative to a landing site’s horizon, but their interfaces are hard to use for **rapid scenario comparison**.
+Claims are **evidence-gated** (`D-de70`): assert only what tests/ADRs back.
+If a validation test exists but has not been run, we say so — we do not pretend
+it already passed.
 
-The brief’s core ask: compare **landing sites and dates**, visualizing **Sun and Earth vs the local horizon** for **solar power** and **direct-to-Earth (DTE)** windows.
+## How it is built (high level)
 
-Full statement archive: [`docs/sources/challenge-statements/clps-lunar-mission-browser.md`](docs/sources/challenge-statements/clps-lunar-mission-browser.md).
+| Piece | Role | Key decisions |
+|-------|------|----------------|
+| Ephemeris / sky | Sun & Earth az/el | Horizons fixtures = success **X** (`D-41fa`) |
+| Horizon masks | Terrain blocking | LOLA DEM schedule (`D-f369`); success **Y** = 28-pt ≤ 5 h |
+| Score | Fail-closed then rank | Two-layer + hazards (`D-de42` lineage); success **Z** |
+| Dust slot | Soil resistance, not lofting | Metzger β=cos(θ) on grain term (`D-06cb`) |
+| Demo hosting | Static Pages for now | Masks often mocked in the public demo (`D-a988`, `D-2533`) |
 
-### Layer A vs layer B
+Decision records: [`docs/records/`](docs/records/). Validation plan: [`docs/validation.md`](docs/validation.md).
 
-| Layer | In product? | Examples |
-|-------|-------------|----------|
-| **A — Local sky at the site** | Yes (core) | Sun/Earth elevation vs horizon; power & DTE windows |
-| **B — Surface / ops hazards** | Yes (portfolio ambition) | Temperature, dust, related site hazards (`D-b8d3`) |
-| **Flight dynamics** | No (except optional filter) | Full Earth–Moon trajectory / ΔV optimization out; approach accessibility filter allowed |
+## Try today (honest limits)
 
----
+**Install**
 
-## Product decisions (current)
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+pytest
+```
 
-| ID | Title | Domain |
-|----|-------|--------|
-| [`D-20261111-pj-60ab`](docs/records/decisions/D-20261111-pj-60ab-product-question.md) | Product question (unchanged) | problem framing |
-| [`D-20261114-pj-7e2a`](docs/records/decisions/D-20261114-pj-7e2a-project-frame-solo-portfolio.md) | Solo portfolio frame | problem framing |
-| [`D-20261114-pj-3c91`](docs/records/decisions/D-20261114-pj-3c91-audience-portfolio.md) | Audience (supersedes `D-ea51`) | problem framing |
-| [`D-20261114-pj-9f04`](docs/records/decisions/D-20261114-pj-9f04-scope-portfolio.md) | Portfolio scope & done (supersedes `D-5cf6`) | scope & success criteria |
-| [`D-20261114-pj-b8d3`](docs/records/decisions/D-20261114-pj-b8d3-layer-b-bodies-trajectory.md) | Layer B / trajectory / multi-body | problem framing |
+**Run the API + chart locally** (needs kernels/masks under `data/` for live mode;
+without them the UI may use mocks — that is **not** the same as computed overnight
+masks, `D-a988`):
 
-Task: [`T-20261114-pj-a1b2`](docs/records/tasks/T-20261114-pj-a1b2-reopen-product-portfolio.md).
+```bash
+uvicorn api.app:app --reload
+# open the URL printed by uvicorn (typically http://127.0.0.1:8000/)
+```
 
----
+**Static demo docs:** [`deploy/README.md`](deploy/README.md) (GitHub Pages).
 
-## Who it is for (`D-3c91`)
+Without a published precomputed mask archive / mask API, the **full** planner
+loop is not what a stranger gets from Pages alone. Local data + API is the
+honest try-today path.
 
-- **Primary audience:** technical portfolio viewer (hiring / peer engineer reading the demo).
-- **Domain depth bar:** mission-planner-grade calculations and metrics.
-- **UI default:** technical + explainable (provenance required). Friendly educator skin optional later — not v1 done.
+## Validation status
 
----
+| Check | Status |
+|-------|--------|
+| X/Y/Z unit tests | run `pytest` (see suite) |
+| Short-night re-check | harness: `python scripts/s12_short_night_recheck.py` — results **planned** until overnight |
+| PGDA 69 comparison | harness: `python scripts/s12_pgda69_compare.py` — **planned**; not a product feature (`D-fe17`) |
 
-## What question the product answers (`D-60ab`, kept)
+## Future
 
-**Scored evaluation under planner constraints**, with search:
-
-1. Planner provides **date/time** (and site) plus **flexibility / thresholds** (max time without sun, without radio, need both, weights…).
-2. System returns a **score**; on minima fail → search toward nearest feasible; inspect **neighborhood** for gains.
-3. **Deep-search mode** over user-specified time–space ranges (name TBD).
-4. **Visualizations** accompany the loop; usefulness over cosmetics.
-
-Four visibility cases (mental model):
-
-| Case | Sun above horizon | Earth above horizon |
-|------|-------------------|---------------------|
-| Both | yes | yes |
-| Sun only | yes | no |
-| Radio only | no | yes |
-| Neither | no | no |
-
----
-
-## Scope for portfolio v1 (`D-9f04` + `D-b8d3`)
-
-| Bucket | Includes |
-|--------|----------|
-| **Core** | Needs-adapted score; explained thresholds + provenance; useful viz set; local neighborhood search; deep-search mode |
-| **Layer B (surface)** | Temperature, dust, related site hazards (models in engine ledger) |
-| **Architecture** | Moon beachhead; **body-agnostic** providers so Mars/others can be a later pack |
-| **Out of v1** | Full trajectory optimization; native mobile; Mars feature parity |
-| **Optional bridge** | Approach / accessibility **filter** (consumes trajectory products; does not compute them) |
-
-**Definition of done:** defendable portfolio demo — backend useful under explicit **X, Y, Z** (engine ledger).
-
----
-
-## Explicitly not decided yet (engine ledger)
-
-- Score formula and success metrics **X, Y, Z** (including how temp/dust enter)
-- Neighborhood / deep-search algorithms and stopping rules
-- Data path (Horizons vs precomputed maps vs LOLA/DEM horizon)
-- Layer-B model choices and validation level
-- Public **claims** wording
-
-Domain brief: [`docs/research/briefs/research-brief-clps-domain.md`](docs/research/briefs/research-brief-clps-domain.md).
-
----
+- Publish precomputed masks (location TBD) and/or a mask API (`D-8c03`).
+- Remotion demo video **after** the UI is finished (`D-1264`, `D-8fd2`).
+- Pitch deck owned by the author for live presentations.
 
 ## Repo layout
 
 ```
-docs/records/          decision-flow records (project, people, tasks, decisions, understanding)
-docs/sources/          archived challenge text and raw fetches
-docs/research/briefs/  research notes
+lunar_eval/     engine (ephemeris, horizon, score, search, hazards)
+api/            FastAPI routes
+web/            static demo UI
+tests/          pytest
+scripts/        precompute, tune, S12 validation harnesses
+docs/records/   decision-flow records
+docs/validation.md
 ```
 
 Language: **repo English**; chat language per person (`docs/records/project.md`).
