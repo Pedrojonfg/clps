@@ -11,6 +11,7 @@ import {
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import "@blueprintjs/icons/lib/css/blueprint-icons.css";
+import { STATIC_DEMO } from "./api";
 import {
   clearAnalyses,
   deleteAnalysis,
@@ -87,6 +88,11 @@ function App() {
       <Navbar>
         <NavbarGroup align={Alignment.LEFT}>
           <NavbarHeading>lunar-eval</NavbarHeading>
+          {STATIC_DEMO && (
+            <Tag intent="warning" style={{ marginRight: 8 }}>
+              Browser demo · mocked data
+            </Tag>
+          )}
           <Tag minimal intent={data?.data_source === "real" ? "success" : "warning"}>
             {data
               ? data.data_source === "real"

@@ -7,6 +7,8 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+  // Static Pages demo is served from a sub-path; relative asset URLs work anywhere.
+  base: process.env.VITE_STATIC_DEMO === "1" ? "./" : "/",
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

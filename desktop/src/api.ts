@@ -1,5 +1,9 @@
 import type { MissionTemplate, PlannerForm, SitePayload } from "./types";
 
+/** Static browser demo (GitHub Pages): no API; reads JSON exported from the API's mock mode. */
+export const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "1";
+const BASE = import.meta.env.BASE_URL;
+
 function toUtcIso(localValue: string): string {
   if (!localValue) return "";
   return `${localValue}:00Z`;
@@ -30,14 +34,17 @@ export function buildSiteQuery(form: PlannerForm): string {
 }
 
 export async function fetchTemplates(): Promise<MissionTemplate[]> {
-  const res = await fetch("/mission-templates");
+  const res = await fetch(STATIC_DEMO ? `${BASE}demo/mission-templates.json` : "/mission-templates");
   if (!res.ok) throw new Error(`templates HTTP ${res.status}`);
   const body = (await res.json()) as { templates: MissionTemplate[] };
   return body.templates ?? [];
 }
 
 export async function fetchSite(form: PlannerForm): Promise<SitePayload> {
-  const res = await fetch(`/site?${buildSiteQuery(form)}`);
+  // ponytail: the API's mock ignores the form too, so one exported payload is faithful.
+  const res = await fetch(
+    STATIC_DEMO ? `${BASE}demo/site-mock.json` : `/site?${buildSiteQuery(form)}`,
+  );
   const body = await res.json();
   if (!res.ok) {
     const msg =
@@ -49,11 +56,14 @@ export async function fetchSite(form: PlannerForm): Promise<SitePayload> {
 
 /** Same-origin URLs via Vite proxy — localStorage ion token is shared with the iframe. */
 export function firstPersonUrl(form: PlannerForm): string {
-  return `/firstperson.html?${buildSiteQuery(form)}`;
+  const p = new URLSearchParams(buildSiteQuery(form));
+  if (STATIC_DEMO) p.set("static", "1");
+  return `${BASE}firstperson.html?${p.toString()}`;
 }
 
 export function regionMapUrl(form: PlannerForm, demo = false): string {
   const p = new URLSearchParams(buildSiteQuery(form));
-  if (demo) p.set("demo", "1");
-  return `/map.html?${p.toString()}`;
+  if (demo || STATIC_DEMO) p.set("demo", "1");
+  if (STATIC_DEMO) p.set("static", "1");
+  return `${BASE}map.html?${p.toString()}`;
 }
