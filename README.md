@@ -111,8 +111,9 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
 - **The desktop app needs the Python API running.** It talks to a local
   FastAPI server, so for now it runs in development mode next to that server.
   There is no packaged installer yet.
-- **The 3D view needs a Cesium ion token** (free account). Without one you
-  get the 2D panorama.
+- **The 3D view needs a Cesium ion token** (free account) whose account has
+  *Cesium Moon Terrain* (asset 2684829) added from the ion Asset Depot.
+  Without both you get the 2D panorama.
 - **Mission presets are approximations.** Preset thresholds are planning
   values based on public mission profiles. They are not official requirements.
 - **Hazards are simple proxies.** Temperature comes from climatology, not a

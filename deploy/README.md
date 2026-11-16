@@ -26,4 +26,4 @@ Repo setting: **Settings → Pages → Source: GitHub Actions**.
 
 ## Cesium ion token
 
-The 3D first-person view needs a Cesium ion token in the browser. Nothing is injected at build time: visitors paste their own free token on the *3D first-person* screen (stored in their `localStorage`). Without a token the view falls back to the 2D horizon panorama.
+The 3D first-person view needs a Cesium ion token in the browser. Nothing is injected at build time: visitors paste their own free token on the *3D first-person* screen (stored in their `localStorage`). The ion account behind the token must also have *Cesium Moon Terrain* (asset 2684829) added to *My Assets* from the [Asset Depot](https://ion.cesium.com/assetdepot/2684829); a token alone gets a 404 for it. Without a token the view falls back to the 2D horizon panorama.

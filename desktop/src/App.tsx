@@ -83,6 +83,16 @@ function App() {
     setScreen("firstperson");
   }
 
+  const openSite = useCallback(
+    (lat: number, lon: number, target: "planner" | "firstperson") => {
+      setForm((f) => ({ ...f, lat: lat.toFixed(5), lon: lon.toFixed(5) }));
+      setData(null);
+      setPlannerBoot(true);
+      setScreen(target);
+    },
+    [],
+  );
+
   return (
     <div className={Classes.DARK} style={{ minHeight: "100vh" }}>
       <Navbar>
@@ -116,7 +126,7 @@ function App() {
 
       <main
         style={{
-          padding: 16,
+          padding: screen === "firstperson" || screen === "map" ? "8px 12px" : 16,
           maxWidth: screen === "firstperson" || screen === "map" ? "100%" : 960,
           margin: "0 auto",
         }}
@@ -156,10 +166,10 @@ function App() {
         )}
 
         {screen === "firstperson" && (
-          <FirstPersonScreen form={form} hasResult={Boolean(data)} />
+          <FirstPersonScreen form={form} />
         )}
 
-        {screen === "map" && <RegionMapScreen form={form} />}
+        {screen === "map" && <RegionMapScreen form={form} onOpenSite={openSite} />}
       </main>
     </div>
   );

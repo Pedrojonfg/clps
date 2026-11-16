@@ -102,3 +102,13 @@ export type SavedAnalysis = {
     longest_lit_h?: number;
   };
 };
+
+export type RegionSearchSummary = {
+  rows_evaluated: number;
+  n_sites: number;
+  runtime_s: number;
+  claim: string;
+  provisional: boolean;
+  window_start: string;
+  window_hours: number;
+};

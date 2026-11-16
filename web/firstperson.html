@@ -4,30 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>First-person view — lunar-eval</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Libre+Franklin:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
     <link
       href="https://cdn.jsdelivr.net/npm/cesium@1.121.1/Build/Cesium/Widgets/widgets.css"
       rel="stylesheet"
     />
+    <!-- Look follows the Blueprint dark theme of the desktop shell (D-01b0, D-b6fe). -->
     <style>
-      :root {
-        --anorthosite: #1a1c22;
-        --anorthosite-mid: #2a2e38;
-        --frost: #8b93a8;
-        --frost-dim: #5c6378;
-        --gold-graze: #c9a227;
-        --gold-dim: #8a7020;
-        --earth-disc: #6a8faa;
-        --ink: #d8dce6;
-        --ink-quiet: #9aa2b4;
-        --ring: #3f4556;
-      }
-
       *,
       *::before,
       *::after {
@@ -39,242 +21,259 @@
         margin: 0;
         height: 100%;
         overflow: hidden;
-        font-family: "Libre Franklin", system-ui, sans-serif;
-        font-size: 15px;
-        line-height: 1.45;
-        color: var(--ink);
-        background: var(--anorthosite);
+        font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        color: #f6f7f9;
+        background: #111418;
       }
 
-      #view-root {
-        position: fixed;
-        inset: 0;
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      .bar {
+        flex: none;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+        padding: 7px 10px;
+        background: #1c2127;
+        font-size: 12px;
+        color: #abb3bf;
+      }
+
+      header.bar {
+        border-bottom: 1px solid #404854;
+      }
+
+      footer.bar {
+        border-top: 1px solid #404854;
+        flex-direction: column;
+        align-items: stretch;
+        flex-wrap: nowrap;
+      }
+
+      footer .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+        min-height: 22px;
+      }
+
+      .spacer {
+        flex: 1;
+      }
+
+      .tag {
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #383e47;
+        color: #f6f7f9;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .tag.ok {
+        background: rgba(35, 133, 81, 0.25);
+        color: #72ca9b;
+      }
+
+      .tag.warn {
+        background: rgba(200, 118, 25, 0.25);
+        color: #fbb360;
+      }
+
+      button {
+        font: inherit;
+        font-size: 12px;
+        color: #f6f7f9;
+        background: #383e47;
+        border: 1px solid #5f6b7c;
+        border-radius: 4px;
+        padding: 2px 8px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      button:hover {
+        background: #404854;
+      }
+
+      a {
+        color: #8abbff;
+      }
+
+      #notice {
+        flex: none;
+        padding: 7px 10px;
+        background: rgba(200, 118, 25, 0.15);
+        border-bottom: 1px solid #404854;
+        font-size: 12px;
+        color: #fbb360;
+      }
+
+      #notice[hidden],
+      [hidden] {
+        display: none !important;
+      }
+
+      #stage {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
       }
 
       #cesiumContainer,
-      #fallback-wrap {
+      #fallback-canvas {
         position: absolute;
         inset: 0;
+        width: 100%;
+        height: 100%;
       }
 
       #cesiumContainer {
-        z-index: 0;
+        cursor: grab;
+        touch-action: none;
       }
 
-      #fallback-wrap {
-        display: none;
-        z-index: 0;
-        background: radial-gradient(ellipse 100% 70% at 50% 100%, #252830 0%, var(--anorthosite) 60%);
+      #cesiumContainer.dragging {
+        cursor: grabbing;
       }
 
-      #fallback-wrap.active {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: center;
-      }
-
-      #fallback-canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        flex: 1;
-      }
-
-      .fallback-caption {
+      #details {
         position: absolute;
-        bottom: 4.5rem;
-        left: 50%;
-        transform: translateX(-50%);
-        max-width: 28rem;
-        padding: 0.5rem 0.75rem;
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.72rem;
-        color: var(--frost);
-        text-align: center;
-        background: rgba(26, 28, 34, 0.88);
-        border: 1px solid var(--ring);
-        pointer-events: none;
+        z-index: 3;
+        top: 8px;
+        left: 10px;
+        width: min(30rem, calc(100% - 20px));
+        padding: 10px 12px;
+        background: #252a31;
+        border: 1px solid #404854;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #abb3bf;
       }
 
-      .chrome {
-        position: absolute;
-        z-index: 2;
-        left: 0;
-        right: 0;
-        pointer-events: none;
-      }
-
-      .chrome > * {
-        pointer-events: auto;
-      }
-
-      .chrome-top {
-        top: 0;
-        padding: 0.85rem 1rem 0.5rem;
-        background: linear-gradient(180deg, rgba(26, 28, 34, 0.92) 0%, rgba(26, 28, 34, 0) 100%);
-      }
-
-      .chrome-top h1 {
-        margin: 0 0 0.15rem;
-        font-size: 1.1rem;
-        font-weight: 600;
-        letter-spacing: -0.02em;
-      }
-
-      .chrome-top .lede {
+      #details ul {
         margin: 0;
-        font-size: 0.82rem;
-        color: var(--frost);
-        max-width: 36em;
-      }
-
-      .tag-mode {
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.68rem;
-        font-weight: 500;
-        color: var(--gold-dim);
-        letter-spacing: 0.04em;
-      }
-
-      .chrome-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.65rem 1rem;
-        margin-top: 0.5rem;
-      }
-
-      .chrome a.back {
-        font-size: 0.82rem;
-        color: var(--gold-graze);
-        text-decoration: none;
-        border-bottom: 1px solid var(--gold-dim);
-      }
-
-      .chrome a.back:hover {
-        color: var(--ink);
-      }
-
-      .provenance-oneliner {
-        margin: 0.35rem 0 0;
-        font-size: 0.78rem;
-        color: var(--frost-dim);
-      }
-
-      details.provenance-details {
-        margin-top: 0.25rem;
-        font-size: 0.72rem;
-        color: var(--ink-quiet);
-        max-width: 36em;
-      }
-
-      details.provenance-details summary {
-        cursor: pointer;
-        color: var(--frost);
-        font-family: "IBM Plex Mono", monospace;
-      }
-
-      details.provenance-details ul {
-        margin: 0.35rem 0 0;
         padding-left: 1.1rem;
       }
 
-      .chrome-bottom {
-        bottom: 0;
-        padding: 0.65rem 1rem 1rem;
-        background: linear-gradient(0deg, rgba(26, 28, 34, 0.94) 0%, rgba(26, 28, 34, 0) 100%);
+      #details li + li {
+        margin-top: 4px;
       }
 
-      .hour-scrub {
-        display: flex;
-        flex-wrap: wrap;
+      #details strong {
+        color: #f6f7f9;
+      }
+
+      .key {
+        display: inline-flex;
         align-items: center;
-        gap: 0.65rem 1rem;
-        max-width: 36rem;
+        gap: 5px;
+        white-space: nowrap;
       }
 
-      .hour-scrub label {
-        font-size: 0.78rem;
-        color: var(--ink-quiet);
+      .key i {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
       }
 
-      .hour-scrub input[type="range"] {
+      .key.sun i {
+        background: #c9a227;
+      }
+
+      .key.earth i {
+        background: #6a8faa;
+      }
+
+      .key.mask i {
+        width: 14px;
+        height: 3px;
+        border-radius: 0;
+        background: #c4b8a8;
+      }
+
+      .key b {
+        font-weight: 400;
+        color: #f6f7f9;
+        font-variant-numeric: tabular-nums;
+      }
+
+      #hour-scrub {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1 1 18rem;
+        max-width: 30rem;
+      }
+
+      #hour-scrub input[type="range"] {
         flex: 1;
-        min-width: 8rem;
-        accent-color: var(--gold-graze);
+        min-width: 6rem;
+        accent-color: #4c90f0;
       }
 
-      .hour-scrub output {
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.75rem;
-        color: var(--ink);
-        min-width: 12rem;
-      }
-
-      #site-meta {
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.7rem;
-        color: var(--frost-dim);
-        margin-top: 0.35rem;
-      }
-
-      #load-status {
-        font-family: "IBM Plex Mono", monospace;
-        font-size: 0.72rem;
-        color: var(--frost);
-      }
-
-      #load-status.err {
-        color: #e8a0a0;
-      }
-
-      .cesium-widget-credits {
-        filter: brightness(0.85);
+      #hour-label {
+        color: #f6f7f9;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
       }
     </style>
   </head>
   <body>
-    <div id="view-root">
-      <div id="cesiumContainer" aria-hidden="true"></div>
-      <div id="fallback-wrap" aria-label="2D mask panorama fallback">
-        <canvas id="fallback-canvas"></canvas>
-        <p class="fallback-caption" id="fallback-caption">
-          Our geometry only: horizon mask silhouette with Sun and Earth at the selected hour — no Cesium backdrop.
-        </p>
-      </div>
+    <div id="app">
+      <header class="bar">
+        <a id="back-link" href="/" hidden>← Horizon planner</a>
+        <span class="tag" id="mode-tag">Loading…</span>
+        <!-- per D-671e: persistent one-liner + expandable details -->
+        <span id="provenance-oneliner">Backdrop: Cesium Moon — not our model</span>
+        <button type="button" id="details-toggle" aria-expanded="false" aria-controls="details">Provenance details</button>
+        <span class="spacer"></span>
+        <span id="look-readout" hidden></span>
+        <span class="tag" id="load-status"></span>
+      </header>
 
-      <div class="chrome chrome-top">
-        <p class="tag-mode" id="mode-tag">Loading…</p>
-        <h1>First-person site view</h1>
-        <p class="lede">
-          Eye-level look-around at 2&nbsp;m above the site. Sun and Earth markers follow our site×time geometry;
-          terrain imagery is separate where shown.
-        </p>
-        <!-- per D-671e -->
-        <p class="provenance-oneliner">Backdrop: Cesium Moon — not our model</p>
-        <details class="provenance-details">
-          <summary>Provenance details</summary>
+      <div id="notice" role="status" hidden></div>
+
+      <div id="stage">
+        <div id="cesiumContainer" hidden></div>
+        <canvas id="fallback-canvas" hidden aria-label="2D horizon mask panorama with Sun and Earth tracks"></canvas>
+        <div id="details" hidden>
           <ul>
-            <li><strong>Ours:</strong> horizon mask elevation profile; Sun and Earth azimuth/elevation for site×time (same series as the horizon planner).</li>
-            <li><strong>Not ours:</strong> Cesium Moon terrain and imagery (Cesium ion asset 2684829; NASA / USGS sources via Cesium).</li>
-            <li><strong>Attribution:</strong> Cesium, NASA, USGS as applicable to ion content.</li>
+            <li><strong>Ours:</strong> the horizon mask line and the Sun and Earth positions for this site and time — the same series the planner scores.</li>
+            <li><strong>Not ours:</strong> Cesium Moon terrain and imagery (Cesium ion asset 2684829; NASA / USGS sources via Cesium). Visual context only: it is not the mask and not the score.</li>
+            <li><strong>Backdrop look:</strong> brightened and lit from our Sun azimuth at a fixed angle so relief reads; it is not a shadow or illumination model.</li>
+            <li><strong>Observer:</strong> 2 m above the surface, look-around only.</li>
+            <li><strong>Attribution:</strong> Cesium ion, NASA, USGS as shown in the on-view credits.</li>
           </ul>
-        </details>
-        <div class="chrome-row">
-          <a class="back" id="back-link" href="/">← Back to horizon planner</a>
-          <span id="load-status"></span>
         </div>
       </div>
 
-      <div class="chrome chrome-bottom">
-        <div class="hour-scrub" id="hour-scrub" hidden>
-          <label for="hour-range">Hour in window</label>
-          <input type="range" id="hour-range" min="0" max="0" value="0" step="1" />
-          <output id="hour-label" for="hour-range">—</output>
+      <footer class="bar">
+        <div class="row">
+          <div id="hour-scrub" hidden>
+            <label for="hour-range">Time</label>
+            <input type="range" id="hour-range" min="0" max="0" value="0" step="1" />
+            <output id="hour-label" for="hour-range">—</output>
+          </div>
+          <span class="spacer"></span>
+          <span id="site-meta"></span>
         </div>
-        <p id="site-meta"></p>
-      </div>
+        <div class="row">
+          <span class="key sun"><i></i>Sun <b id="sun-state">—</b></span>
+          <button type="button" id="face-sun" hidden>Face Sun</button>
+          <span class="key earth"><i></i>Earth <b id="earth-state">—</b></span>
+          <button type="button" id="face-earth" hidden>Face Earth</button>
+          <span class="spacer"></span>
+          <span class="key mask"><i></i>Our horizon mask</span>
+        </div>
+      </footer>
     </div>
 
     <script>
