@@ -60,7 +60,7 @@ def main(out_dir: Path) -> None:
     client = TestClient(app)
     responses = {
         "mission-templates.json": client.get("/mission-templates"),
-        "site-mock.json": client.get("/site?mock=1"),
+        "site-mock.json": client.get("/site?mock=1&local_search=1"),
         "region-map-demo.json": client.post(
             "/region-map",
             json={"rows": DEMO_ROWS, "search_partial": True, "best": DEMO_ROWS[0]},

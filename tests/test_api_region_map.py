@@ -46,7 +46,7 @@ def test_region_map_total_coverage():
         assert s["induced"] is False
         assert len(s["rgba"]) == 4
     black = [s for s in p["samples"] if not s["feasible"]][0]
-    assert black["rgba"][:3] == [0, 0, 0]  # per D-8acb
+    assert black["rgba"][:3] == [176, 131, 240]  # per D-2325 violet, not black
 
 
 def test_region_map_partial_induces_and_marks_best():

@@ -14,7 +14,14 @@ export type MissionTemplate = {
 export type SitePayload = {
   data_source?: string;
   site?: { lat_deg: number; lon_deg: number; name?: string };
-  mask: { elevation_deg: number[]; lat?: number; lon?: number };
+  mask: {
+    elevation_deg: number[];
+    /** geographic_az = azimuth_zero_deg + azimuth_sign × index_az (D-20261116-pj-b43a). */
+    azimuth_zero_deg?: number;
+    azimuth_sign?: number;
+    lat?: number;
+    lon?: number;
+  };
   sky: Array<{
     time_utc: string;
     sun_az_deg: number;
@@ -36,6 +43,8 @@ export type SitePayload = {
   score: {
     feasible: boolean;
     score: number;
+    companion_score?: number;
+    breakdown?: { failing?: string[] };
     provenance?: {
       score_formula?: string;
       schedule_version?: string;

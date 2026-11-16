@@ -6,12 +6,12 @@ import {
   Classes,
   FormGroup,
   HTMLSelect,
-  HTMLTable,
   InputGroup,
   Spinner,
 } from "@blueprintjs/core";
 import { STATIC_DEMO, fetchSite, fetchTemplates } from "../api";
-import { PolarChart } from "../PolarChart";
+import { LocalSearchBoard } from "../LocalSearchBoard";
+import { SiteResult } from "../SiteCharts";
 import { DEMO_SITE, MissionTemplate, PlannerForm, SitePayload } from "../types";
 
 type Props = {
@@ -39,7 +39,6 @@ export function PlannerScreen({
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [hideGapStars, setHideGapStars] = useState(false);
 
   useEffect(() => {
     fetchTemplates()
@@ -113,9 +112,16 @@ export function PlannerScreen({
   }
 
   const sc = data?.score;
-  const board = data?.local_search?.leaderboard?.filter(
-    (r) => !hideGapStars || !r.hazard_gap_star,
-  );
+
+  /** Move the window to a leaderboard start, keeping its length; the user then re-runs. */
+  function useStart(windowStartIso: string) {
+    const span = Date.parse(`${form.end}:00Z`) - Date.parse(`${form.start}:00Z`);
+    const t0 = Date.parse(windowStartIso);
+    if (!Number.isFinite(span) || !Number.isFinite(t0)) return;
+    const local = (ms: number) => new Date(ms).toISOString().slice(0, 16);
+    setForm((f) => ({ ...f, start: local(t0), end: local(t0 + span) }));
+    setStatus("Window moved to the selected start — press Run planner to evaluate it.");
+  }
 
   return (
     <div>
@@ -123,8 +129,8 @@ export function PlannerScreen({
         New analysis — site×time planner
       </h2>
       <p className={Classes.TEXT_MUTED} style={{ marginTop: 0 }}>
-        Polar sky chart: azimuth from north at top. Evaluator on this machine; remote role is
-        horizon masks only.
+Scores one landing site over one time window: when the Sun and the Earth clear the local
+        horizon, and whether that meets the mission's needs. Evaluated on this machine.
       </p>
       {STATIC_DEMO && (
         <Callout intent="warning" title="Browser demo: mocked data" style={{ marginBottom: 12 }}>
@@ -258,7 +264,7 @@ export function PlannerScreen({
           />
           <Checkbox
             checked={form.local_search}
-            label="Local search (time slide)"
+            label="Local search (best nearby starts)"
             onChange={(e) => setField("local_search", e.currentTarget.checked)}
           />
           <Checkbox
@@ -292,8 +298,8 @@ export function PlannerScreen({
       </form>
 
       {status && (
-        <Callout>
-          <Spinner size={16} /> {status}
+        <Callout style={{ marginBottom: 12 }}>
+          {busy && <Spinner size={16} />} {status}
         </Callout>
       )}
       {error && (
@@ -307,87 +313,23 @@ export function PlannerScreen({
       )}
 
       {data && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <section>
-            <PolarChart data={data} />
-          </section>
-          <section>
-            <h3 className={Classes.HEADING}>Score</h3>
-            <p style={{ fontSize: 28, margin: "0 0 8px", color: "#c9a227" }}>
-              {sc?.feasible ? sc.score.toFixed(3) : "0.000 (infeasible)"}
+        <div style={{ opacity: busy ? 0.5 : 1 }}>
+          <SiteResult data={data} />
+          <Callout style={{ marginTop: 16 }} icon="info-sign">
+            <strong>Provenance</strong> ·{" "}
+            {data.data_source === "real"
+              ? "horizon mask computed from LOLA DEMs, Sun and Earth from SPICE kernels"
+              : "mocked horizon and sky — not a result"}{" "}
+            · score formula {sc?.provenance?.score_formula ?? "—"}
+          </Callout>
+          {form.local_search && !data.local_search && (
+            <p className={Classes.TEXT_MUTED} style={{ marginTop: 16 }}>
+              Local search is ticked but this result was computed without it. Press Run planner to add the
+              leaderboard.
             </p>
-            <HTMLTable compact striped style={{ width: "100%" }}>
-              <tbody>
-                <tr>
-                  <td>Longest night</td>
-                  <td>{data.series.longest_night_h} h</td>
-                </tr>
-                <tr>
-                  <td>Longest no-Earth</td>
-                  <td>{data.series.longest_no_earth_h} h</td>
-                </tr>
-                <tr>
-                  <td>Longest continuous lit</td>
-                  <td>{data.series.longest_lit_h ?? "—"} h</td>
-                </tr>
-                <tr>
-                  <td>Any sun ∧ Earth</td>
-                  <td>{data.series.any_both ? "yes" : "no"}</td>
-                </tr>
-                <tr>
-                  <td>Hazards</td>
-                  <td>{data.hazards_enabled ? "on" : "off"}</td>
-                </tr>
-              </tbody>
-            </HTMLTable>
-            <Callout style={{ marginTop: 12 }} title="Provenance">
-              {data.data_source === "real" ? "mask: computed/cached" : "mask: mocked"} ·{" "}
-              {sc?.provenance?.score_formula ?? "—"}
-            </Callout>
-          </section>
+          )}
+          <LocalSearchBoard data={data} onUseStart={useStart} />
         </div>
-      )}
-
-      {board && board.length > 0 && (
-        <section style={{ marginTop: 24 }}>
-          <h3 className={Classes.HEADING}>Local search</h3>
-          <Checkbox
-            checked={hideGapStars}
-            label="Hide hazard-gap rows (*)"
-            onChange={(e) => setHideGapStars(e.currentTarget.checked)}
-          />
-          <HTMLTable compact striped style={{ width: "100%" }}>
-            <thead>
-              <tr>
-                <th>Pick</th>
-                <th>Start</th>
-                <th>Feasible</th>
-                <th>Score</th>
-                <th>Companion</th>
-                <th>Δ h</th>
-                <th>km</th>
-              </tr>
-            </thead>
-            <tbody>
-              {board.map((r) => {
-                const pick =
-                  data?.local_search?.pick &&
-                  r.window_start === data.local_search.pick.window_start;
-                return (
-                  <tr key={`${r.window_start}-${r.distance_km}`}>
-                    <td>{pick ? "★" : r.hazard_gap_star ? "*" : ""}</td>
-                    <td>{r.window_start ?? "—"}</td>
-                    <td>{r.feasible ? "yes" : "no"}</td>
-                    <td>{Number(r.score).toFixed(3)}</td>
-                    <td>{Number(r.companion_score).toFixed(3)}</td>
-                    <td>{Number(r.distance_hours).toFixed(1)}</td>
-                    <td>{Number(r.distance_km).toFixed(3)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </HTMLTable>
-        </section>
       )}
     </div>
   );

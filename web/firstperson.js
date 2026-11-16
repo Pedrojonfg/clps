@@ -2,6 +2,9 @@
  * D-ac34 hybrid (third-party backdrop + our mask/sky), D-7d58 CesiumJS + Cesium Moon,
  * D-f2d3 2 m observer / look-around only, D-e062 same site×time query as the planner,
  * D-671e provenance one-liner + details, D-ac74 2D mask panorama when Cesium is unavailable.
+ * 2026-11-16: D-26d2 playback + follow, D-7304 brightness follows our Sun-disc fraction,
+ * D-08e8 Earth-link indicator (chips, compass strip, time strip), D-ce2e max backdrop quality,
+ * D-b43a mask azimuth convention.
  */
 
 (function () {
@@ -14,13 +17,23 @@
   const MASK_FILL = "#4a4650";
   const PITCH_MIN = -25;
   const PITCH_MAX = 70;
+  const SUN_RADIUS_DEG = 0.2665;
+  const EARTH_RADIUS_DEG = 0.95;
+  const NIGHT_FLOOR = 0.07; // per D-7304
+  const RELIEF_LIGHT_EL_DEG = 20; // cosmetic: true polar sun is too grazing for relief to read
+  const OK = "#72ca9b";
+  const BAD = "#fa999c";
 
   const EMBEDDED = window.parent !== window;
   const $ = (id) => document.getElementById(id);
 
   const state = {
     data: null,
-    skyIndex: 0,
+    t: 0, // fractional index into data.sky; playback interpolates between samples (D-26d2)
+    playing: false,
+    speed: 2, // hours of window per second
+    follow: "off", // off | sun | earth
+    now: null, // interpolated sky at t
     mode: "loading",
     viewer: null,
     query: "",
@@ -87,7 +100,8 @@
     }
     return {
       data_source: "mock",
-      mask: { elevation_deg: mask_elev, lat: state.lat, lon: state.lon },
+      // Built directly in geographic azimuth, unlike API masks (D-b43a).
+      mask: { elevation_deg: mask_elev, azimuth_zero_deg: 0, azimuth_sign: 1, lat: state.lat, lon: state.lon },
       sky,
     };
   }
@@ -153,13 +167,73 @@
     box.hidden = false;
   }
 
+  /** Horizon elevation at a geographic azimuth; the array has its own azimuth (D-b43a). */
   function maskAt(azDeg) {
-    const el = state.data.mask.elevation_deg;
+    const m = state.data.mask;
+    const el = m.elevation_deg;
     const n = el.length;
-    const f = ((((azDeg % 360) + 360) % 360) / 360) * n;
+    const zero = m.azimuth_zero_deg ?? 180;
+    const sign = m.azimuth_sign ?? -1;
+    const idxAz = (((sign * (azDeg - zero)) % 360) + 360) % 360;
+    const f = (idxAz / 360) * n;
     const i = Math.floor(f) % n;
     const t = f - Math.floor(f);
     return el[i] * (1 - t) + el[(i + 1) % n] * t;
+  }
+
+  /** Visible fraction of a disc of the given radius whose centre is `clearDeg` above the mask. */
+  function discFraction(clearDeg, radiusDeg) {
+    const x = Math.max(-1, Math.min(1, clearDeg / radiusDeg));
+    return 1 - (Math.acos(x) - x * Math.sqrt(1 - x * x)) / Math.PI;
+  }
+
+  /** Per-sample fractions: the planner's own series when present, else from mask and sky. */
+  function fractionsFor(i) {
+    const d = state.data;
+    const s = d.sky[i];
+    const sf = d.series?.sun_fraction?.[i];
+    const ef = d.series?.earth_fraction?.[i];
+    return {
+      sun: Number.isFinite(sf) ? sf : discFraction(s.sun_el_deg - maskAt(s.sun_az_deg), SUN_RADIUS_DEG),
+      earth: Number.isFinite(ef) ? ef : discFraction(s.earth_el_deg - maskAt(s.earth_az_deg), EARTH_RADIUS_DEG),
+    };
+  }
+
+  function thresholds() {
+    const n = state.data.needs || {};
+    return { sun: Number(n.sun_lit_threshold ?? 0), earth: Number(n.earth_lit_threshold ?? 0) };
+  }
+
+  function lerpAz(a, b, f) {
+    const d = ((b - a + 540) % 360) - 180; // shortest way round
+    return (((a + d * f) % 360) + 360) % 360;
+  }
+
+  /** Sky at fractional index t: linear between the hourly samples the planner scored (D-26d2). */
+  function skyAt(t) {
+    const sky = state.data.sky;
+    const i0 = Math.max(0, Math.min(sky.length - 1, Math.floor(t)));
+    const i1 = Math.min(sky.length - 1, i0 + 1);
+    const f = Math.max(0, Math.min(1, t - i0));
+    const a = sky[i0];
+    const b = sky[i1];
+    const fa = fractionsFor(i0);
+    const fb = fractionsFor(i1);
+    const thr = thresholds();
+    const sunFrac = fa.sun + (fb.sun - fa.sun) * f;
+    const earthFrac = fa.earth + (fb.earth - fa.earth) * f;
+    const ms = Date.parse(a.time_utc) + (Date.parse(b.time_utc) - Date.parse(a.time_utc)) * f;
+    return {
+      timeMs: ms,
+      sunAz: lerpAz(a.sun_az_deg, b.sun_az_deg, f),
+      sunEl: a.sun_el_deg + (b.sun_el_deg - a.sun_el_deg) * f,
+      earthAz: lerpAz(a.earth_az_deg, b.earth_az_deg, f),
+      earthEl: a.earth_el_deg + (b.earth_el_deg - a.earth_el_deg) * f,
+      sunFrac,
+      earthFrac,
+      sunLit: sunFrac > thr.sun,
+      earthLink: earthFrac > thr.earth,
+    };
   }
 
   const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
@@ -167,22 +241,133 @@
     return COMPASS[Math.round((((azDeg % 360) + 360) % 360) / 45) % 8];
   }
 
-  function bodyState(az, el) {
-    const clear = el - maskAt(az);
-    const where = `${el.toFixed(1)}° el · az ${az.toFixed(0)}° ${compass(az)}`;
-    return { visible: clear > 0, text: `${where} · ${clear > 0 ? "above" : "behind"} mask` };
+  function pctText(frac) {
+    if (frac >= 0.999) return "full disc";
+    if (frac <= 0.001) return "hidden";
+    return `${Math.round(frac * 100)} % of disc`;
   }
 
-  function fmtTime(iso) {
-    return iso.replace("T", " ").replace(/:00Z$/, " UTC").replace(/Z$/, " UTC");
+  function bodyText(az, el, frac) {
+    return `${el.toFixed(1)}° el · az ${az.toFixed(0)}° ${compass(az)} · ${pctText(frac)}`;
+  }
+
+  function fmtTimeMs(ms) {
+    return new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+  }
+
+  function setChip(id, ok, icon, text, frac) {
+    const chip = $(id);
+    chip.classList.toggle("ok", ok);
+    chip.classList.toggle("off", !ok);
+    chip.querySelector(".chip-icon").textContent = icon;
+    chip.querySelector(".chip-text").textContent = text;
+    chip.querySelector(".chip-bar i").style.width = `${Math.round(100 * Math.max(0, Math.min(1, frac)))}%`;
   }
 
   function updateReadouts() {
-    const s = state.data.sky[state.skyIndex];
-    $("hour-label").textContent = s ? fmtTime(s.time_utc) : "—";
-    if (!s) return;
-    $("sun-state").textContent = bodyState(s.sun_az_deg, s.sun_el_deg).text;
-    $("earth-state").textContent = bodyState(s.earth_az_deg, s.earth_el_deg).text;
+    const n = state.now;
+    if (!n) return;
+    $("hour-label").textContent = fmtTimeMs(n.timeMs);
+    $("sun-state").textContent = bodyText(n.sunAz, n.sunEl, n.sunFrac);
+    $("earth-state").textContent = bodyText(n.earthAz, n.earthEl, n.earthFrac);
+    // per D-08e8: state in words and icon, not colour alone
+    setChip(
+      "chip-sun",
+      n.sunLit,
+      n.sunLit ? "☀" : "☾",
+      n.sunFrac >= 0.999 ? "Sunlight · full disc" : n.sunFrac <= 0.001 ? "Night · Sun hidden by terrain" : `Sunlight · ${Math.round(n.sunFrac * 100)} % of disc`,
+      n.sunFrac,
+    );
+    setChip(
+      "chip-earth",
+      n.earthLink,
+      n.earthLink ? "✓" : "✕",
+      n.earthLink
+        ? n.earthFrac >= 0.999 ? "Earth link · direct" : `Earth link · direct (${Math.round(n.earthFrac * 100)} % of disc)`
+        : "Earth link · blocked by terrain",
+      n.earthFrac,
+    );
+  }
+
+  /** Hour-by-hour strip under the slider: Sun-disc fraction and Earth link over the window. */
+  function drawTimeStrip() {
+    const c = $("time-strip");
+    const W = c.clientWidth;
+    const H = c.clientHeight;
+    if (!W || !H) return;
+    const dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(W * dpr);
+    c.height = Math.round(H * dpr);
+    const ctx = c.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = state.data.sky.length;
+    const thr = thresholds();
+    const pad = 8; // range thumb half-width, so cells line up with thumb positions
+    const cw = (W - 2 * pad) / Math.max(1, n - 1);
+    const rowH = (H - 3) / 2;
+    for (let i = 0; i < n; i++) {
+      const f = fractionsFor(i);
+      const x = pad + (i - 0.5) * cw;
+      ctx.fillStyle = "#2f343c";
+      ctx.fillRect(x, 0, cw + 0.5, rowH);
+      ctx.fillRect(x, rowH + 3, cw + 0.5, rowH);
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.sun));
+      ctx.fillStyle = SUN;
+      ctx.fillRect(x, 0, cw + 0.5, rowH);
+      ctx.globalAlpha = f.earth > thr.earth ? 0.35 + 0.65 * f.earth : 0;
+      ctx.fillStyle = EARTH;
+      ctx.fillRect(x, rowH + 3, cw + 0.5, rowH);
+      ctx.globalAlpha = 1;
+    }
+    const x = pad + state.t * cw;
+    ctx.fillStyle = "#f6f7f9";
+    ctx.fillRect(x - 1, 0, 2, H);
+  }
+
+  function setTime(t, fromSlider) {
+    const max = state.data.sky.length - 1;
+    state.t = Math.max(0, Math.min(max, t));
+    state.now = skyAt(state.t);
+    if (!fromSlider) $("hour-range").value = String(state.t);
+    refresh();
+  }
+
+  function setPlaying(on) {
+    state.playing = on && state.data.sky.length > 1;
+    const b = $("play-toggle");
+    b.textContent = state.playing ? "❚❚ Pause" : "▶ Play";
+    b.setAttribute("aria-pressed", String(state.playing));
+  }
+
+  function setFollow(which) {
+    state.follow = which;
+    $("follow-select").value = which;
+  }
+
+  let lastFrame = null;
+  function playbackTick(now) {
+    requestAnimationFrame(playbackTick);
+    const dt = lastFrame === null ? 0 : Math.min(0.1, (now - lastFrame) / 1000);
+    lastFrame = now;
+    if (!state.data) return;
+    if (state.playing) {
+      const sky = state.data.sky;
+      const stepH = (Date.parse(sky[1].time_utc) - Date.parse(sky[0].time_utc)) / 3_600_000 || 1;
+      let t = state.t + (dt * state.speed) / stepH;
+      if (t >= sky.length - 1) t = 0; // loop
+      setTime(t, false);
+    }
+    if (state.mode === "cesium") {
+      if (state.follow !== "off" && state.now) {
+        const n = state.now;
+        state.look.heading = state.follow === "sun" ? n.sunAz : n.earthAz;
+        state.look.pitch = Math.min(PITCH_MAX, Math.max(4, state.follow === "sun" ? n.sunEl : n.earthEl));
+        applyLook();
+      }
+      drawCompass();
+      const ts = state.cesium?.tileset;
+      $("terrain-loading").hidden = !ts || ts.tilesLoaded;
+    }
   }
 
   function setupChrome(data, params) {
@@ -200,12 +385,24 @@
     if (data.sky.length > 1) {
       $("hour-scrub").hidden = false;
       range.max = String(data.sky.length - 1);
-      range.value = String(state.skyIndex);
+      range.step = "any";
+      range.value = String(state.t);
     }
     range.addEventListener("input", () => {
-      state.skyIndex = Number(range.value);
-      refresh();
+      setPlaying(false);
+      setTime(Number(range.value), true);
     });
+    $("play-toggle").addEventListener("click", () => setPlaying(!state.playing));
+    $("speed-select").addEventListener("change", (ev) => {
+      state.speed = Number(ev.target.value) || 2;
+    });
+    $("follow-select").addEventListener("change", (ev) => setFollow(ev.target.value));
+    window.addEventListener("keydown", (ev) => {
+      if (ev.code !== "Space" || /^(INPUT|SELECT|BUTTON|TEXTAREA)$/.test(ev.target.tagName)) return;
+      ev.preventDefault();
+      setPlaying(!state.playing);
+    });
+    new ResizeObserver(() => drawTimeStrip()).observe($("time-strip"));
 
     const toggle = $("details-toggle");
     toggle.addEventListener("click", () => {
@@ -213,13 +410,86 @@
       $("details").hidden = !open;
       toggle.setAttribute("aria-expanded", String(open));
     });
+    $("hud").hidden = false;
+    state.now = skyAt(state.t);
     updateReadouts();
+    drawTimeStrip();
+    requestAnimationFrame(playbackTick);
   }
 
   function refresh() {
     updateReadouts();
+    drawTimeStrip();
     if (state.mode === "cesium") updateCesiumSky();
     else if (state.mode === "fallback") drawFallback2D();
+  }
+
+  /** per D-08e8: where the Sun and the Earth are relative to the current heading. */
+  function drawCompass() {
+    const c = $("compass");
+    const W = c.clientWidth;
+    const H = c.clientHeight;
+    const n = state.now;
+    if (!W || !H || !n) return;
+    const dpr = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(W * dpr)) {
+      c.width = Math.round(W * dpr);
+      c.height = Math.round(H * dpr);
+    }
+    const ctx = c.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const SPAN = 180; // degrees of heading across the strip
+    const head = ((state.look.heading % 360) + 360) % 360;
+    const rel = (az) => ((az - head + 540) % 360) - 180;
+    const X = (az) => W / 2 + (rel(az) / SPAN) * W;
+    ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    for (let az = 0; az < 360; az += 15) {
+      const x = X(az);
+      if (x < 4 || x > W - 4) continue;
+      const major = az % 45 === 0;
+      ctx.fillStyle = major ? "#abb3bf" : "#5f6b7c";
+      ctx.fillRect(Math.round(x), H - (major ? 9 : 5), 1, major ? 9 : 5);
+      if (major) {
+        ctx.fillStyle = az % 90 === 0 ? "#f6f7f9" : "#abb3bf";
+        ctx.fillText(COMPASS[az / 45], x, H - 12);
+      }
+    }
+    ctx.fillStyle = "#f6f7f9";
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 5, 0);
+    ctx.lineTo(W / 2 + 5, 0);
+    ctx.lineTo(W / 2, 6);
+    ctx.fill();
+
+    const body = (az, color, on, letter) => {
+      const r = rel(az);
+      const off = Math.abs(r) > SPAN / 2 - 4;
+      const x = off ? (r < 0 ? 12 : W - 12) : X(az);
+      const y = 12;
+      ctx.beginPath();
+      ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+      ctx.fillStyle = on ? color : "#1c2127";
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      if (!on) {
+        ctx.beginPath();
+        ctx.moveTo(x - 5, y + 5);
+        ctx.lineTo(x + 5, y - 5);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#f6f7f9";
+      ctx.textAlign = off ? (r < 0 ? "left" : "right") : "left";
+      const label = off ? (r < 0 ? `◀ ${letter}` : `${letter} ▶`) : letter;
+      ctx.fillText(label, off ? (r < 0 ? x + 10 : x - 10) : x + 10, y + 4);
+      ctx.textAlign = "center";
+    };
+    body(n.earthAz, EARTH, n.earthLink, "Earth");
+    body(n.sunAz, SUN, n.sunLit, "Sun");
   }
 
   /* ---------- Cesium backdrop + our overlays ---------- */
@@ -291,6 +561,7 @@
     const el = $("cesiumContainer");
     let last = null;
     el.addEventListener("pointerdown", (ev) => {
+      setFollow("off"); // manual look-around wins over follow (D-26d2)
       last = [ev.clientX, ev.clientY];
       el.setPointerCapture(ev.pointerId);
       el.classList.add("dragging");
@@ -323,6 +594,7 @@
       const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, 3], ArrowDown: [0, -3] }[ev.key];
       if (!step) return;
       ev.preventDefault();
+      setFollow("off");
       state.look.heading += step[0];
       state.look.pitch = Math.min(PITCH_MAX, Math.max(PITCH_MIN, state.look.pitch + step[1]));
       applyLook();
@@ -362,14 +634,14 @@
     });
 
     // Ours (D-ac34): horizon mask as a line on the sky, drawn over the backdrop.
-    const elev = state.data.mask.elevation_deg;
-    const ring = elev.map((el, i) => dirToWorld((i * 360) / elev.length, el, OVERLAY_DISTANCE_M));
+    const ring = [];
+    for (let az = 0; az < 360; az += 0.5) ring.push(dirToWorld(az, maskAt(az), OVERLAY_DISTANCE_M));
     ring.push(ring[0]);
     line(ring, MASK_LINE, 2.5, 0.95);
 
     ["N", "E", "S", "W"].forEach((name, i) => {
       ents.add({
-        position: dirToWorld(i * 90, maskAt(i * 90) + 1.5, OVERLAY_DISTANCE_M),
+        position: dirToWorld(i * 90, maskAt(i * 90) + 3, OVERLAY_DISTANCE_M),
         label: { ...labelStyle(name, "#abb3bf"), pixelOffset: new Cesium.Cartesian2(0, 0) },
       });
     });
@@ -377,7 +649,18 @@
     for (const seg of trackSegments("sun_az_deg", "sun_el_deg")) line(seg, SUN, 1.5, 0.55);
     for (const seg of trackSegments("earth_az_deg", "earth_el_deg")) line(seg, EARTH, 1.5, 0.55);
 
-    const marker = (css, size) =>
+    // Soft glow so the Sun reads as a light source; scaled by the visible fraction.
+    const glow = document.createElement("canvas");
+    glow.width = glow.height = 128;
+    const g = glow.getContext("2d");
+    const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+    grad.addColorStop(0, "rgba(255, 244, 200, 0.9)");
+    grad.addColorStop(0.25, "rgba(255, 220, 120, 0.35)");
+    grad.addColorStop(1, "rgba(255, 200, 80, 0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+
+    const marker = (css, size, withGlow) =>
       ents.add({
         position: state.cesium.origin,
         point: {
@@ -387,37 +670,47 @@
           outlineWidth: 2,
           disableDepthTestDistance: always,
         },
+        billboard: withGlow ? { image: glow, disableDepthTestDistance: always } : undefined,
         label: labelStyle("", css),
       });
-    state.cesium.sun = marker(SUN, 16);
-    state.cesium.earth = marker(EARTH, 13);
+    state.cesium.sun = marker("#fff1b8", 14, true);
+    state.cesium.earth = marker(EARTH, 13, false);
+    state.cesium.light = new Cesium.DirectionalLight({ direction: new Cesium.Cartesian3(0, 0, -1), intensity: 3.0 });
+    state.viewer.scene.light = state.cesium.light;
   }
 
   function updateCesiumSky() {
     const Cesium = window.Cesium;
-    const s = state.data.sky[state.skyIndex];
-    if (!s || !state.cesium) return;
-    const put = (ent, name, az, el) => {
+    const n = state.now;
+    if (!n || !state.cesium) return;
+    const put = (ent, name, az, el, frac, on, text) => {
       ent.position = dirToWorld(az, el, OVERLAY_DISTANCE_M);
-      const visible = bodyState(az, el).visible;
-      ent.label.text = visible ? `${name} · ours` : `${name} · ours · behind our mask`;
-      ent.point.color = Cesium.Color.fromCssColorString(name === "Sun" ? SUN : EARTH).withAlpha(visible ? 1 : 0.45);
+      if (ent.label.text?.getValue?.() !== text) ent.label.text = text;
+      ent.point.color = Cesium.Color.fromCssColorString(name === "Sun" ? "#fff1b8" : EARTH).withAlpha(on ? 0.4 + 0.6 * frac : 0.4);
+      if (ent.billboard) {
+        ent.billboard.scale = 0.4 + 1.4 * frac;
+        ent.billboard.color = Cesium.Color.WHITE.withAlpha(frac);
+      }
     };
-    put(state.cesium.sun, "Sun", s.sun_az_deg, s.sun_el_deg);
-    put(state.cesium.earth, "Earth", s.earth_az_deg, s.earth_el_deg);
+    put(
+      state.cesium.sun, "Sun", n.sunAz, n.sunEl, n.sunFrac, n.sunLit,
+      n.sunFrac <= 0.001 ? "Sun · behind our mask" : n.sunFrac >= 0.999 ? "Sun · ours" : `Sun · ours · ${Math.round(n.sunFrac * 100)} % of disc`,
+    );
+    put(
+      state.cesium.earth, "Earth", n.earthAz, n.earthEl, n.earthFrac, n.earthLink,
+      n.earthLink ? "Earth · ours · link" : "Earth · ours · behind our mask",
+    );
 
-    // Backdrop relief is lit from our Sun azimuth at a fixed 35° so flat ground still reads.
-    // Polar sun is a few degrees high; real grazing light would leave the backdrop black.
+    // per D-7304: backdrop brightness follows OUR visible Sun-disc fraction, with a dim night
+    // floor. Direction is our Sun azimuth at a fixed relief angle; no shadows are cast.
     try {
       const toSun = Cesium.Cartesian3.subtract(
-        dirToWorld(s.sun_az_deg, 35, 1000),
+        dirToWorld(n.sunAz, RELIEF_LIGHT_EL_DEG, 1000),
         state.cesium.origin,
         new Cesium.Cartesian3(),
       );
-      state.viewer.scene.light = new Cesium.DirectionalLight({
-        direction: Cesium.Cartesian3.normalize(Cesium.Cartesian3.negate(toSun, toSun), toSun),
-        intensity: 3.0,
-      });
+      Cesium.Cartesian3.normalize(Cesium.Cartesian3.negate(toSun, toSun), state.cesium.light.direction);
+      state.cesium.shader?.setUniform("u_sun", NIGHT_FLOOR + (1 - NIGHT_FLOOR) * n.sunFrac);
     } catch (_) {
       /* lighting is cosmetic */
     }
@@ -461,25 +754,44 @@
         infoBox: false,
         selectionIndicator: false,
         scene3DOnly: true,
+        // per D-ce2e: native device pixels (capped) and multisampling
+        msaaSamples: 4,
+        useBrowserRecommendedResolution: false,
       });
+      viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 2);
+      viewer.scene.postProcessStages.fxaa.enabled = false; // MSAA does the work; FXAA only blurs
+      viewer.scene.highDynamicRange = false;
       // Cesium's own Sun and Moon would contradict our site×time geometry.
       if (viewer.scene.sun) viewer.scene.sun.show = false;
       if (viewer.scene.moon) viewer.scene.moon.show = false;
 
       const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CESIUM_MOON_ION_ASSET, {
         enableCollision: true,
-        maximumScreenSpaceError: 6, // sharper near ground from a 2 m eye
+        // per D-ce2e: fine level of detail everywhere in view (no foveation), from a 2 m eye
+        maximumScreenSpaceError: 2,
+        dynamicScreenSpaceError: false,
+        foveatedScreenSpaceError: false,
+        skipLevelOfDetail: false,
+        cacheBytes: 1024 * 1024 * 1024,
+        maximumCacheOverflowBytes: 512 * 1024 * 1024,
       });
       // Polar imagery has its shadows baked in and reads almost black from 2 m; lift the albedo
-      // so the backdrop is legible. Visual context only (D-671e) — this is not a photometric model.
-      tileset.customShader = new Cesium.CustomShader({
-        uniforms: { u_gain: { type: Cesium.UniformType.FLOAT, value: 1.6 } },
+      // a little so the backdrop is legible, then scale by our Sun-disc fraction (D-7304), with a
+      // slightly cool tint toward night. Visual context only (D-671e) — not a photometric model.
+      const shader = new Cesium.CustomShader({
+        uniforms: {
+          u_gain: { type: Cesium.UniformType.FLOAT, value: 1.35 },
+          u_sun: { type: Cesium.UniformType.FLOAT, value: 1.0 },
+        },
         fragmentShaderText: `
           void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
-            material.diffuse = clamp(pow(material.diffuse, vec3(0.6)) * u_gain + 0.05, 0.0, 1.0);
+            vec3 lifted = clamp(pow(material.diffuse, vec3(0.75)) * u_gain + 0.03, 0.0, 1.0);
+            vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0), u_sun);
+            material.diffuse = lifted * tint * u_sun;
           }
         `,
       });
+      tileset.customShader = shader;
       viewer.scene.primitives.add(tileset);
       state.viewer = viewer;
 
@@ -489,6 +801,8 @@
       const origin = Cesium.Cartesian3.fromDegrees(lon, lat, (ground ?? 0) + OBSERVER_HEIGHT_M, Cesium.Ellipsoid.MOON);
       state.cesium = {
         origin,
+        tileset,
+        shader,
         enu: Cesium.Transforms.eastNorthUpToFixedFrame(origin, Cesium.Ellipsoid.MOON),
       };
       if (ground === null) {
@@ -501,19 +815,22 @@
       updateCesiumSky();
 
       // Start facing the Sun if it clears our mask, else the Earth, else north.
-      const s = state.data.sky[state.skyIndex];
-      if (s && bodyState(s.sun_az_deg, s.sun_el_deg).visible) face(s.sun_az_deg, 4);
-      else if (s && bodyState(s.earth_az_deg, s.earth_el_deg).visible) face(s.earth_az_deg, 4);
+      const n0 = state.now;
+      if (n0 && n0.sunFrac > 0) face(n0.sunAz, 4);
+      else if (n0 && n0.earthLink) face(n0.earthAz, 4);
       else applyLook();
 
       $("mode-tag").textContent = "Cesium Moon backdrop + our mask & sky";
       $("provenance-oneliner").textContent = "Backdrop: Cesium Moon — not our model"; // per D-671e
       $("look-readout").hidden = false;
-      for (const [id, az, el] of [["face-sun", "sun_az_deg", "sun_el_deg"], ["face-earth", "earth_az_deg", "earth_el_deg"]]) {
+      $("compass").hidden = false;
+      $("follow-wrap").hidden = false;
+      for (const [id, which] of [["face-sun", "sun"], ["face-earth", "earth"]]) {
         $(id).hidden = false;
         $(id).addEventListener("click", () => {
-          const now = state.data.sky[state.skyIndex];
-          if (now) face(now[az], now[el]);
+          const n = state.now;
+          setFollow("off");
+          if (n) face(which === "sun" ? n.sunAz : n.earthAz, which === "sun" ? n.sunEl : n.earthEl);
         });
       }
       return true;
@@ -555,6 +872,10 @@
 
     ctx.fillStyle = "#111418";
     ctx.fillRect(0, 0, W, H);
+    // per D-7304: the plot brightens with our visible Sun-disc fraction.
+    const lit = state.now ? state.now.sunFrac : 0;
+    ctx.fillStyle = `rgba(120, 140, 170, ${(0.16 * lit).toFixed(3)})`;
+    ctx.fillRect(pad.l, pad.t, pw, ph);
 
     // Grid + axes
     const span = elMax - elMin;
@@ -593,16 +914,17 @@
     // Our mask silhouette: everything under the line is terrain.
     ctx.beginPath();
     ctx.moveTo(toX(0), pad.t + ph);
-    for (let i = 0; i <= elev.length; i++) ctx.lineTo(toX((i * 360) / elev.length), toY(elev[i % elev.length]));
+    for (let az = 0; az <= 360; az += 0.5) ctx.lineTo(toX(az), toY(maskAt(az)));
     ctx.lineTo(toX(360), pad.t + ph);
     ctx.closePath();
-    ctx.fillStyle = MASK_FILL;
+    const shade = Math.round(40 + 70 * lit);
+    ctx.fillStyle = `rgb(${shade + 8}, ${shade + 4}, ${shade + 12})`;
     ctx.fill();
     ctx.beginPath();
-    for (let i = 0; i <= elev.length; i++) {
-      const x = toX((i * 360) / elev.length);
-      const y = toY(elev[i % elev.length]);
-      if (i === 0) ctx.moveTo(x, y);
+    for (let az = 0; az <= 360; az += 0.5) {
+      const x = toX(az);
+      const y = toY(maskAt(az));
+      if (az === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = MASK_LINE;
@@ -636,10 +958,9 @@
     track("sun_az_deg", "sun_el_deg", SUN);
 
     // Bodies at the selected time: solid when clear of our mask, hollow when behind it.
-    function body(az, el, color, name, r) {
+    function body(az, el, color, text, visible, r) {
       const x = toX(az);
       const y = toY(el);
-      const visible = bodyState(az, el).visible;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fillStyle = visible ? color : "#111418";
@@ -647,22 +968,21 @@
       ctx.strokeStyle = visible ? "#111418" : color;
       ctx.lineWidth = 2;
       ctx.stroke();
-      const text = visible ? name : `${name} (behind mask)`;
       const tw = ctx.measureText(text).width;
       const right = x + r + 8 + tw < pad.l + pw;
       const tx = right ? x + r + 8 : x - r - 8 - tw;
       const ty = Math.max(pad.t + 12, y - r - 6);
       ctx.fillStyle = "rgba(28, 33, 39, 0.9)";
       ctx.fillRect(tx - 4, ty - 12, tw + 8, 17);
-      ctx.fillStyle = color;
+      ctx.fillStyle = "#f6f7f9";
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
       ctx.fillText(text, tx, ty);
     }
-    const s = data.sky[state.skyIndex];
-    if (s) {
-      body(s.earth_az_deg, s.earth_el_deg, EARTH, "Earth", 7);
-      body(s.sun_az_deg, s.sun_el_deg, SUN, "Sun", 8);
+    const n = state.now;
+    if (n) {
+      body(n.earthAz, n.earthEl, EARTH, n.earthLink ? "Earth · link" : "Earth · behind mask", n.earthLink, 7);
+      body(n.sunAz, n.sunEl, SUN, `Sun · ${pctText(n.sunFrac)}`, n.sunFrac > 0.001, 8);
     }
   }
 
@@ -678,7 +998,7 @@
   async function main() {
     const params = parseQuery();
     state.data = await fetchSiteData();
-    state.skyIndex = skyIndexForStart(state.data, params);
+    state.t = skyIndexForStart(state.data, params);
     setupChrome(state.data, params);
 
     // per D-7d58 / D-ac74: no token, no ion asset or a failed start → 2D panorama

@@ -42,43 +42,87 @@ def firstperson_js() -> FileResponse:
 app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="web-assets")
 
 
-def _mock_site_payload() -> dict:
-    """Explicit CI-only mock. # ponytail: legacy shape for contract tests."""
+MASK_AZIMUTH_ZERO_DEG = 180.0  # per D-20261116-pj-b43a: geographic az of mask index 0
+MASK_AZIMUTH_SIGN = -1  # geographic_az = zero + sign * index_az (see visibility._mask_el_at_geo_az)
+
+
+def _mock_local_search(anchor: datetime, window_hours: int, scored: dict) -> dict:
+    """Synthetic time-slide leaderboard in the real shape and order. # per D-20261116-pj-4902"""
+    from lunar_eval.search.local import _sort_key
+
+    base = float(scored["score"]) if scored["feasible"] else 0.9
+    rows = []
+    for off in range(-window_hours, window_hours + 1):
+        # Smooth made-up quality over the slide, with an infeasible stretch on one side.
+        q = 0.78 + 0.22 * math.cos(math.radians(off * 9.0 + 25.0)) - 0.004 * abs(off)
+        feasible = scored["feasible"] if off == 0 else not (-19 <= off <= -12)
+        companion = base * q if off else float(scored.get("companion_score", base))
+        rows.append(
+            {
+                "site": {"lat_deg": -89.46316, "lon_deg": 222.51045},
+                "window_start": anchor + timedelta(hours=off),
+                "window_hours": window_hours,
+                "feasible": feasible,
+                "score": round(companion, 4) if feasible else 0.0,
+                "companion_score": round(companion if feasible else 0.35 * companion, 4),
+                "hazard_gap_star": off in (7, 8),
+                "distance_hours": float(abs(off)),
+                "distance_km": 0.0,
+            }
+        )
+    board = sorted(rows, key=_sort_key)
+    for r in board:
+        r["window_start"] = r["window_start"].isoformat().replace("+00:00", "Z")
+    return {"pick": board[0], "leaderboard": board}
+
+
+def _mock_site_payload(local_search: bool = False) -> dict:
+    """Explicit mock: made-up horizon and sky, scored by the real series and score code."""
+    import numpy as np
+
+    from lunar_eval.score import score
+    from lunar_eval.visibility import _mask_el_at_geo_az, longest_lit_h, longest_night_h, sun_fraction
+
     t0 = datetime(2026, 6, 21, 0, 0, tzinfo=timezone.utc)
-    sky: list[dict] = []
-    sun_frac: list[float] = []
-    earth_frac: list[float] = []
-    mask_elev = []
-    for i in range(720):
-        az = i * 0.5
-        h = 1.6 + 0.85 * math.sin(math.radians(az * 2.17))
+
+    def horizon_geo(az: float) -> float:
+        h = 0.9 + 0.7 * math.sin(math.radians(az * 2.17))
         if 145 < az < 235:
-            h += 2.8 * math.exp(-((az - 192) ** 2) / 180)
-        mask_elev.append(round(h, 4))
+            h += 2.6 * math.exp(-((az - 192) ** 2) / 180)
+        return h
 
-    def mask_at(az_deg: float) -> float:
-        return mask_elev[int(round(az_deg * 2)) % 720]
+    # Stored like real masks: index azimuth runs from the pole direction, mirrored (D-b43a).
+    mask_elev = [
+        round(horizon_geo((MASK_AZIMUTH_ZERO_DEG + MASK_AZIMUTH_SIGN * i * 0.5) % 360.0), 4)
+        for i in range(720)
+    ]
 
+    sky: list[dict] = []
     for h in range(24):
         ts = t0 + timedelta(hours=h)
-        sun_az = ((h / 24.0) * 360 + 12) % 360
-        sun_el = -2.4 + 4.8 * max(0, math.sin(math.radians((h - 6) * 15)))
-        earth_az = (sun_az + 118) % 360
-        earth_el = 4.5 + 3.2 * math.sin(math.radians(h * 18 - 40))
         sky.append(
             {
                 "time_utc": ts.isoformat().replace("+00:00", "Z"),
-                "sun_az_deg": round(sun_az, 2),
-                "sun_el_deg": round(sun_el, 3),
-                "earth_az_deg": round(earth_az, 2),
-                "earth_el_deg": round(earth_el, 3),
+                "sun_az_deg": round(((h / 24.0) * 360 + 12) % 360, 2),
+                "sun_el_deg": round(1.25 + 0.95 * math.sin(math.radians((h - 3) * 15)), 3),
+                "earth_az_deg": round(20 + 6 * math.sin(math.radians(h * 15)), 2),
+                "earth_el_deg": round(2.2 + 2.0 * math.sin(math.radians(h * 15 - 40)), 3),
             }
         )
-        sun_frac.append(1.0 if sun_el > mask_at(sun_az) else 0.0)
-        earth_frac.append(1.0 if earth_el > 0.5 else 0.0)
 
-    from lunar_eval.score import score
-    from lunar_eval.visibility import longest_lit_h, longest_night_h
+    elev = np.asarray(mask_elev)
+    sun_frac = sun_fraction(
+        np.array([s["sun_el_deg"] for s in sky]),
+        _mask_el_at_geo_az(np.array([s["sun_az_deg"] for s in sky]), elev),
+        0.2665,
+    )
+    earth_frac = sun_fraction(
+        np.array([s["earth_el_deg"] for s in sky]),
+        _mask_el_at_geo_az(np.array([s["earth_az_deg"] for s in sky]), elev),
+        0.95,
+    )
+    sun_frac = [round(float(v), 4) for v in sun_frac]
+    earth_frac = [round(float(v), 4) for v in earth_frac]
 
     needs = {
         "max_night_h": 72,
@@ -91,22 +135,25 @@ def _mock_site_payload() -> dict:
         "earth_lit_threshold": 0.5,
         "bridge_h": 5,
     }
+    sun_arr, earth_arr = np.asarray(sun_frac), np.asarray(earth_frac)
     series = {
         "sun_fraction": sun_frac,
         "earth_fraction": earth_frac,
-        "longest_night_h": longest_night_h(sun_frac),
-        "longest_no_earth_h": longest_night_h(earth_frac),
-        "longest_lit_h": longest_lit_h(sun_frac, lit_threshold=0.0, bridge_h=5),
-        "hours_sun_above_threshold": int(sum(1 for v in sun_frac if v > 0.0)),
-        "hours_earth_above_threshold": int(sum(1 for v in earth_frac if v > 0.0)),
-        "any_both": any(sf and ef for sf, ef in zip(sun_frac, earth_frac, strict=True)),
+        "longest_night_h": longest_night_h(sun_arr, 0.5),
+        "longest_no_earth_h": longest_night_h(earth_arr, 0.5),
+        "longest_lit_h": longest_lit_h(sun_arr, lit_threshold=0.5, bridge_h=5),
+        "hours_sun_above_threshold": int(np.sum(sun_arr > 0.5)),
+        "hours_earth_above_threshold": int(np.sum(earth_arr > 0.5)),
+        "any_both": bool(np.any((sun_arr > 0.5) & (earth_arr > 0.5))),
         "schedule_version": SCHEDULE_VERSION,
     }
     scored = score(series, {}, needs)
-    return {
+    payload = {
         "data_source": "mock",
         "mask": {
             "elevation_deg": mask_elev,
+            "azimuth_zero_deg": MASK_AZIMUTH_ZERO_DEG,
+            "azimuth_sign": MASK_AZIMUTH_SIGN,
             "schedule_version": SCHEDULE_VERSION,
             "lat": -89.46316,
             "lon": 222.51045,
@@ -117,6 +164,9 @@ def _mock_site_payload() -> dict:
         "hazards_enabled": False,
         "needs": needs,
     }
+    if local_search:
+        payload["local_search"] = _mock_local_search(t0, len(sky) - 1, scored)
+    return payload
 
 
 class RegionMapBody(BaseModel):
@@ -170,7 +220,7 @@ def site(
 ) -> dict:
     # per D-20261114-pj-8588: mock only when mock=1
     if mock == 1:
-        return _mock_site_payload()
+        return _mock_site_payload(local_search=local_search == 1)
 
     from lunar_eval.planner_payload import build_planner_payload, kernels_available, parse_time_window
     from lunar_eval.planner_templates import DEMO_SITE01, template_needs
