@@ -51,10 +51,10 @@ React and Blueprint, and has four screens:
 
 | Screen | What you get |
 |--------|--------------|
-| **New analysis** | Site, time window, mission preset or custom needs. Result: score, pass/fail per limit, Sun/Earth visibility over time, polar chart of the horizon with the Sun and Earth tracks. |
+| **New analysis** | Site, time window, mission preset or custom needs. Result: score, each mission need against the value achieved, a horizon panorama with the Sun and Earth tracks, a timeline of how much of each disc is visible, and (optionally) a leaderboard of the best nearby window starts. |
 | **Past analyses** | Saved runs; reopen one or jump to its 3D view. |
-| **3D first-person** | Look around from the landing site 2 m above the ground, with the mask and Sun/Earth tracks overlaid on a 3D Moon (Cesium). If the 3D view is not available, it shows a 2D horizon panorama instead. |
-| **Region map** | Scores of a search run, drawn on a textured, orbitable Moon. |
+| **3D first-person** | Look around from the landing site 2 m above the ground, with the mask and Sun/Earth tracks overlaid on a 3D Moon (Cesium). The window can be played back; the scene brightens and dims with the visible fraction of the Sun's disc, and an indicator shows whether the Earth is in line of sight. If the 3D view is not available, it shows a 2D horizon panorama instead. |
+| **Region map** | Scores of a search run on a textured, orbitable Moon: a marker per evaluated cell, a faint interpolated estimate between them (labelled as not scored), and a list of the best cells. |
 
 Every result shows where its horizon mask came from: **computed** from terrain
 data, or **mocked** (a stand-in curve). That way a demo is never mistaken for

@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
+// Where the local API listens; override to run a second dev stack beside the default one.
+const api = process.env.LUNAR_EVAL_API ?? "http://127.0.0.1:8000";
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
@@ -20,15 +22,15 @@ export default defineConfig(() => ({
     strictPort: true,
     host: host || "0.0.0.0",
     proxy: {
-      "/site": "http://127.0.0.1:8000",
-      "/mission-templates": "http://127.0.0.1:8000",
-      "/deep-search": "http://127.0.0.1:8000",
-      "/region-map": "http://127.0.0.1:8000",
-      "/map.html": "http://127.0.0.1:8000",
-      "/map.js": "http://127.0.0.1:8000",
-      "/firstperson.html": "http://127.0.0.1:8000",
-      "/firstperson.js": "http://127.0.0.1:8000",
-      "/assets": "http://127.0.0.1:8000",
+      "/site": api,
+      "/mission-templates": api,
+      "/deep-search": api,
+      "/region-map": api,
+      "/map.html": api,
+      "/map.js": api,
+      "/firstperson.html": api,
+      "/firstperson.js": api,
+      "/assets": api,
     },
     hmr: host
       ? {

@@ -483,8 +483,12 @@
 
         const mask = data.mask.elevation_deg;
         const pts = [];
-        for (let i = 0; i < 720; i++) {
-          const az = i * 0.5;
+        // per D-20261116-pj-b43a: the array has its own azimuth; geographic = zero + sign × index.
+        const azZero = data.mask.azimuth_zero_deg ?? 180;
+        const azSign = data.mask.azimuth_sign ?? -1;
+        for (let k = 0; k < 720; k++) {
+          const az = k * 0.5;
+          const i = Math.round((((azSign * (az - azZero)) % 360) + 360) % 360 * 2) % 720;
           const el = mask[i];
           const p = azElevToXY(az, el);
           pts.push(`${p.x},${p.y}`);

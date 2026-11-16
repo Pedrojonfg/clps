@@ -37,7 +37,8 @@ The ceiling is the asset: from a 2 m eye the ground is far coarser than our 5 m 
 
 ## Checks raised
 
-- Finest tiles cost network and GPU → tile cache raised; a "Loading terrain" hint shows while tiles refine.
+- Finer tiles cost network and GPU → tile cache raised; a "Loading finer terrain" hint shows while tiles refine.
+- Seen at build: the asset renders as plain shaded grey relief with no surface imagery near the eye, so sharper settings cannot add ground detail.
 
 ## Values
 
@@ -45,7 +46,7 @@ The ceiling is the asset: from a 2 m eye the ground is far coarser than our 5 m 
 |------|-------|-------|
 | s10_resolution | native_device_pixels (capped at 2×) | |
 | s10_msaa_samples | 4 | Where WebGL2 is available |
-| s10_tileset_max_screen_space_error | 1 | Finest practical level of detail |
+| s10_tileset_max_screen_space_error | 2 (was 6), no foveation or dynamic relaxation | 1 was tried at build and kept refining without settling in the test browser |
 | s10_backdrop_source | unchanged | `D-7d58` |
 
 ## Expected behavior and validation

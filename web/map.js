@@ -1,8 +1,11 @@
 /**
  * S9 region score map — orbitable Moon with the score layer painted on it.
- * Decisions: D-4126 3D Moon, D-8acb infeasible black + in-query dots, D-7227 absolute RYG
- * (colours come from the API), D-834a interpolate overview / lift solid cell on focus,
- * D-85bf induced cells fainter than evaluated.
+ * Decisions: D-4126 3D Moon, D-7227 absolute RYG (colours come from the API), D-834a lift a
+ * solid cell on focus, D-85bf paint what the search evaluated.
+ * 2026-11-16 — D-2325: evaluated cells are markers with a minimum on-screen size, infeasibles
+ * are violet (not black), the pointer snaps to the nearest evaluated cell, best-cells list.
+ * D-1df2 (proposed): a distance-faded estimate layer fills between evaluated cells by
+ * four-quadrant inverse distance; it replaces drawing the API's four-neighbour induced copies.
  *
  * Everything that is data lives in south-polar stereographic metres (the cap grid of
  * lunar_eval.horizon.polar_stereo_xy), so 1 km cells stay square at the pole.
@@ -15,7 +18,11 @@ const MOON_R_KM = 1737.4;
 const FOV_DEG = 40;
 const ALT_MIN = 0.006; // ~10 km above the surface; closer only magnifies the 50 m/px relief
 const ALT_MAX = 4;
-const FIELD_ALPHA = 0.92;
+const CELL = 1 / MOON_R_KM; // the cap grid is 1 km
+const ESTIMATE_ALPHA = 0.6; // at an evaluated cell; falls to 0 at reach (D-1df2)
+const PICK_PX = 24; // pointer snaps to the nearest evaluated cell within this radius (D-2325)
+const TOP_N = 8;
+const INFEASIBLE_RGB = [176, 131, 240];
 const PLANNER_KEYS = [
   "start", "end", "step_h", "template_id",
   "max_night_h", "max_no_earth_h", "min_continuous_lit_h",
@@ -215,16 +222,16 @@ scene.add(overlay);
 
 /* ---------- data state ---------- */
 
-/** @type {{samples: any[], cell: number, hash: Map<string, number[]>, best: any|null}} */
-let data = { samples: [], cell: 1 / MOON_R_KM, hash: new Map(), best: null };
+/** samples = evaluated cells only; spacing = their typical separation (Moon radii). */
+let data = { samples: [], spacing: CELL, hash: new Map(), best: null, ceiling: 1.4, estimate: null };
 let hovered = null;
 let selected = null;
+let markers = null;
 const tiles = { hover: null, selected: null };
 
-function estimateCell(samples) {
-  // Median nearest-neighbour spacing; the cap grid is 1 km, demo rows are sparser.
-  const fallback = 1 / MOON_R_KM;
-  if (samples.length < 2) return fallback;
+function estimateSpacing(samples) {
+  // Median nearest-neighbour spacing of evaluated cells.
+  if (samples.length < 2) return CELL;
   const pick = samples.length > 400 ? samples.filter((_, i) => i % Math.ceil(samples.length / 400) === 0) : samples;
   const nn = pick.map((a) => {
     let best = Infinity;
@@ -235,14 +242,19 @@ function estimateCell(samples) {
     }
     return best;
   }).filter(Number.isFinite).sort((a, b) => a - b);
-  if (!nn.length) return fallback;
-  return Math.min(Math.max(nn[Math.floor(nn.length / 2)], 0.2 / MOON_R_KM), 20 / MOON_R_KM);
+  if (!nn.length) return CELL;
+  return Math.min(Math.max(nn[Math.floor(nn.length / 2)], 0.2 * CELL), 60 * CELL);
+}
+
+/** Integer grid key (string keys made the estimate pass several times slower). */
+function hashKey(ix, iy) {
+  return (ix + 32768) * 65536 + (iy + 32768);
 }
 
 function buildHash(samples, cell) {
   const hash = new Map();
   samples.forEach((s, i) => {
-    const k = `${Math.floor(s.x / cell)},${Math.floor(s.y / cell)}`;
+    const k = hashKey(Math.floor(s.x / cell), Math.floor(s.y / cell));
     if (!hash.has(k)) hash.set(k, []);
     hash.get(k).push(i);
   });
@@ -250,14 +262,14 @@ function buildHash(samples, cell) {
 }
 
 function neighbours(x, y, reach) {
-  const { cell, hash } = data;
-  const ix = Math.floor(x / cell);
-  const iy = Math.floor(y / cell);
+  const { spacing, hash } = data;
+  const ix = Math.floor(x / spacing);
+  const iy = Math.floor(y / spacing);
   const out = [];
   for (let dy = -reach; dy <= reach; dy++) {
     for (let dx = -reach; dx <= reach; dx++) {
-      const b = hash.get(`${ix + dx},${iy + dy}`);
-      if (b) out.push(...b);
+      const b = hash.get(hashKey(ix + dx, iy + dy));
+      if (b) for (const i of b) out.push(i);
     }
   }
   return out;
@@ -266,7 +278,7 @@ function neighbours(x, y, reach) {
 function nearestSample(x, y, maxDist) {
   let best = null;
   let bestD = maxDist;
-  for (const i of neighbours(x, y, Math.max(1, Math.ceil(maxDist / data.cell)))) {
+  for (const i of neighbours(x, y, Math.min(5, Math.ceil(maxDist / data.spacing) + 1))) {
     const s = data.samples[i];
     const d = Math.hypot(s.x - x, s.y - y);
     if (d < bestD) {
@@ -277,140 +289,244 @@ function nearestSample(x, y, maxDist) {
   return best;
 }
 
-/* ---------- overview field (D-834a interpolate; D-8acb black; D-85bf induced alpha) ---------- */
+/** Same absolute ramp as lunar_eval.region_map.feasible_score_to_rgb (D-7227). */
+function scoreRgb(score) {
+  const c = data.ceiling;
+  const mid = c / 2;
+  const v = Math.max(0, Math.min(c, score));
+  return v <= mid ? [255, Math.round((255 * v) / mid), 0] : [Math.round(255 * (1 - (v - mid) / (c - mid))), 255, 0];
+}
 
-function buildField() {
-  const { samples, cell } = data;
-  const pad = 2.5 * cell;
+/* ---------- view scale ---------- */
+
+function pxWorld() {
+  // Moon radii per CSS pixel at the surface under the camera.
+  return (2 * view.alt * Math.tan((FOV_DEG * Math.PI) / 360)) / Math.max(1, host.clientHeight);
+}
+
+/** Marker diameter in CSS px: never below a readable minimum, true cell size once larger (D-2325). */
+function markerPx() {
+  const w = pxWorld();
+  const spacingPx = data.spacing / w;
+  const minPx = Math.min(11, Math.max(7, 0.9 * spacingPx));
+  return Math.max(minPx, Math.min(0.9 * spacingPx, (0.94 * CELL) / w));
+}
+
+/* ---------- evaluated cells: always-visible markers (D-2325) ---------- */
+
+const MARKER_VERT = `
+  attribute vec3 aColor;
+  attribute float aKind;
+  attribute float aBad;
+  uniform float uSize;
+  varying vec3 vColor;
+  varying float vKind;
+  varying float vBad;
+  void main() {
+    vColor = aColor;
+    vKind = aKind;
+    vBad = aBad;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = uSize;
+  }
+`;
+const MARKER_FRAG = `
+  uniform float uSize;
+  varying vec3 vColor;
+  varying float vKind;
+  varying float vBad;
+  void main() {
+    vec2 p = gl_PointCoord * 2.0 - 1.0;
+    float r = length(p);
+    float px = 2.0 / uSize;
+    if (r > 1.0) discard;
+    float edge = smoothstep(1.0, 1.0 - 0.8 * px, r);
+    float ring = smoothstep(1.0 - 1.9 * px, 1.0 - 1.0 * px, r);
+    vec3 col = vColor;
+    if (vKind > 0.5) {
+      // Infeasible: violet with a cross; inner dot grows with badness within this query.
+      float cross = min(abs(p.x - p.y), abs(p.x + p.y)) * 0.7071;
+      float arm = (1.0 - smoothstep(0.55 * px, 1.1 * px, cross)) * step(r, 0.6) * step(12.0, uSize);
+      col = mix(col, vec3(0.07, 0.08, 0.1), arm);
+      float dot = step(26.0, uSize) * (1.0 - smoothstep(0.0, px, r - (0.1 + 0.22 * vBad)));
+      col = mix(col, vec3(0.96, 0.97, 0.98), dot);
+    }
+    col = mix(col, vec3(0.07, 0.08, 0.1), ring);
+    gl_FragColor = vec4(col, edge);
+  }
+`;
+
+function buildMarkers() {
+  // Draw order: infeasible first, then feasible by ascending score, so the best sit on top.
+  const order = [...data.samples].sort((a, b) =>
+    a.feasible !== b.feasible ? (a.feasible ? 1 : -1) : a.score - b.score);
+  const n = order.length;
+  const pos = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  const kind = new Float32Array(n);
+  const bad = new Float32Array(n);
+  const v = new THREE.Vector3();
+  order.forEach((s, i) => {
+    stereoToVec3(s.x, s.y, MARK_R, v);
+    pos.set([v.x, v.y, v.z], 3 * i);
+    col.set([s.rgba[0] / 255, s.rgba[1] / 255, s.rgba[2] / 255], 3 * i);
+    kind[i] = s.feasible ? 0 : 1;
+    bad[i] = s.marker_t == null ? 0 : 1 - Math.min(1, Math.max(0, Number(s.marker_t)));
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+  g.setAttribute("aKind", new THREE.BufferAttribute(kind, 1));
+  g.setAttribute("aBad", new THREE.BufferAttribute(bad, 1));
+  markers = new THREE.Points(g, new THREE.ShaderMaterial({
+    uniforms: { uSize: { value: 8 } },
+    vertexShader: MARKER_VERT,
+    fragmentShader: MARKER_FRAG,
+    transparent: true,
+    depthWrite: false,
+  }));
+  markers.renderOrder = 4;
+  markers.frustumCulled = false;
+  overlay.add(markers);
+}
+
+/* ---------- estimate layer between evaluated cells (D-1df2, proposed) ---------- */
+
+/**
+ * Four-quadrant inverse distance (the rule of D-affb): the nearest evaluated cell in each
+ * quadrant, weights 1/d². Returns null beyond `reach` of every evaluated cell.
+ */
+function estimateAt(x, y, reach) {
+  const near = [null, null, null, null];
+  const nd = [Infinity, Infinity, Infinity, Infinity];
+  let dMin = Infinity;
+  for (const i of neighbours(x, y, Math.ceil(reach / data.spacing))) {
+    const s = data.samples[i];
+    const dx = s.x - x;
+    const dy = s.y - y;
+    const d = Math.hypot(dx, dy);
+    if (d > reach) continue;
+    const q = (dx >= 0 ? 1 : 0) + (dy >= 0 ? 2 : 0);
+    if (d < nd[q]) {
+      nd[q] = d;
+      near[q] = s;
+    }
+    if (d < dMin) dMin = d;
+  }
+  if (!Number.isFinite(dMin)) return null;
+  const soft = (0.05 * data.spacing) ** 2;
+  let w = 0, wf = 0, sc = 0, n = 0;
+  for (let q = 0; q < 4; q++) {
+    const s = near[q];
+    if (!s) continue;
+    n += 1;
+    const wq = 1 / (nd[q] * nd[q] + soft);
+    w += wq;
+    if (s.feasible) {
+      wf += wq;
+      sc += wq * s.score;
+    }
+  }
+  const pFeasible = wf / w;
+  return { dMin, n, pFeasible, feasible: pFeasible >= 0.5, score: wf > 0 ? sc / wf : 0 };
+}
+
+function buildEstimate() {
+  const { samples, spacing } = data;
+  const reach = Math.min(60 * CELL, Math.max(3 * CELL, 3 * spacing));
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (const s of samples) {
     x0 = Math.min(x0, s.x); x1 = Math.max(x1, s.x);
     y0 = Math.min(y0, s.y); y1 = Math.max(y1, s.y);
   }
-  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
-  const cellsX = (x1 - x0) / cell;
-  const cellsY = (y1 - y0) / cell;
-  const ppc = Math.max(2, Math.min(10, Math.floor(1536 / Math.max(cellsX, cellsY))));
-  const w = Math.max(2, Math.round(cellsX * ppc));
-  const h = Math.max(2, Math.round(cellsY * ppc));
+  x0 -= reach; x1 += reach; y0 -= reach; y1 += reach;
+  const px = Math.max(spacing / 4, Math.max(x1 - x0, y1 - y0) / 420);
+  const w = Math.max(2, Math.round((x1 - x0) / px));
+  const h = Math.max(2, Math.round((y1 - y0) / px));
 
   // Straight RGBA (a 2D canvas would premultiply and band the faint edges).
-  const px = new Uint8Array(w * h * 4);
-  const reachD = 2.2 * cell;
-  const soft = (0.2 * cell) ** 2;
-
+  const tex = new Uint8Array(w * h * 4);
   for (let j = 0; j < h; j++) {
     const y = y0 + ((j + 0.5) / h) * (y1 - y0); // DataTexture row 0 = v 0 = y0
     for (let i = 0; i < w; i++) {
-      const x = x0 + ((i + 0.5) / w) * (x1 - x0);
-      let dMin = Infinity;
-      let near = null;
-      let wSum = 0, r = 0, g = 0, b = 0, aSum = 0, aW = 0;
-      for (const si of neighbours(x, y, 3)) {
-        const s = samples[si];
-        const d2 = (s.x - x) ** 2 + (s.y - y) ** 2;
-        const d = Math.sqrt(d2);
-        if (d < dMin) {
-          dMin = d;
-          near = s;
-        }
-        if (d >= reachD) continue;
-        const wgt = (1 - d / reachD) ** 2 / (d2 + soft);
-        aSum += wgt * s.rgba[3];
-        aW += wgt;
-        if (!s.feasible) continue;
-        wSum += wgt;
-        r += wgt * s.rgba[0]; g += wgt * s.rgba[1]; b += wgt * s.rgba[2];
-      }
-      if (!near || !aW) continue;
-      // Coverage: solid inside the cell, gone 1.8 cells from the closest sample.
-      const t = Math.min(1, Math.max(0, (1.8 * cell - dMin) / (1.1 * cell)));
-      const alpha = FIELD_ALPHA * (aSum / aW) * t * t * (3 - 2 * t);
+      const e = estimateAt(x0 + ((i + 0.5) / w) * (x1 - x0), y, reach);
+      if (!e) continue;
+      const rgb = e.feasible ? scoreRgb(e.score) : INFEASIBLE_RGB;
+      const t = Math.max(0, 1 - e.dMin / reach);
       const k = 4 * (j * w + i);
-      if (near.feasible && wSum > 0) {
-        // The API ramp always has max(r, g) = 255; renormalise so blends stay on the ramp.
-        const m = Math.max(r, g, 1e-9);
-        px[k] = Math.round((255 * r) / m);
-        px[k + 1] = Math.round((255 * g) / m);
-        px[k + 2] = Math.round((255 * b) / m);
-      } // else infeasible: stays black (D-8acb)
-      px[k + 3] = Math.round(255 * alpha);
+      tex[k] = rgb[0]; tex[k + 1] = rgb[1]; tex[k + 2] = rgb[2];
+      // Quadratic fade: already weak at half reach, so far-from-data colour never looks solid.
+      tex[k + 3] = Math.round(255 * ESTIMATE_ALPHA * (e.feasible ? 1 : 0.6) * t * t);
     }
   }
-
-  const tex = new THREE.DataTexture(px, w, h, THREE.RGBAFormat);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = tex.minFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
+  const map = new THREE.DataTexture(tex, w, h, THREE.RGBAFormat);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.magFilter = map.minFilter = THREE.LinearFilter;
+  map.needsUpdate = true;
   const spanKm = Math.max(x1 - x0, y1 - y0) * MOON_R_KM;
   const mesh = new THREE.Mesh(
     stereoPatchGeometry(x0, x1, y0, y1, spanKm > 120 ? 128 : 48, FIELD_R),
-    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
   );
   mesh.renderOrder = 3;
+  mesh.visible = !evaluatedOnly();
   overlay.add(mesh);
+  data.estimate = { mesh, reach };
 }
 
-/** D-8acb: white dot on evaluated infeasible cells, size = badness relative to this query. */
-function buildInfeasibleDots() {
-  const list = data.samples.filter((s) => !s.feasible && !s.induced && s.marker_t != null);
-  if (!list.length) return;
-  const mesh = new THREE.InstancedMesh(
-    new THREE.CircleGeometry(1, 20),
-    new THREE.MeshBasicMaterial({ color: 0xf6f7f9, side: THREE.DoubleSide, depthWrite: false, transparent: true }),
-    list.length,
-  );
-  const scale = new THREE.Matrix4();
-  list.forEach((s, i) => {
-    // marker_t is 1 for the best companion score among infeasibles: bigger dot = worse.
-    const badness = 1 - Math.min(1, Math.max(0, Number(s.marker_t)));
-    const rad = data.cell * (0.1 + 0.24 * badness);
-    mesh.setMatrixAt(i, frameAt(s.x, s.y, MARK_R).multiply(scale.makeScale(rad, rad, 1)));
-  });
-  mesh.renderOrder = 4;
-  overlay.add(mesh);
+function evaluatedOnly() {
+  return $("evaluated-only").checked;
 }
 
 function clearOverlay() {
   for (const c of [...overlay.children]) {
     overlay.remove(c);
-    c.geometry?.dispose();
-    for (const m of [].concat(c.material ?? [])) {
-      m.map?.dispose();
-      m.dispose();
-    }
+    c.traverse?.((o) => {
+      o.geometry?.dispose();
+      for (const m of [].concat(o.material ?? [])) {
+        m.map?.dispose();
+        m.dispose();
+      }
+    });
   }
+  markers = null;
   tiles.hover = tiles.selected = null;
   hovered = selected = null;
 }
 
-/* ---------- focus: lifted solid cell (D-834a) ---------- */
+/* ---------- focus: lifted solid cell (D-834a), sized with the markers ---------- */
 
 function makeTile(sample, strong) {
-  const { cell } = data;
-  const side = cell * 0.94;
-  const lift = cell * (strong ? 0.7 : 0.45);
   const color = new THREE.Color().setRGB(sample.rgba[0] / 255, sample.rgba[1] / 255, sample.rgba[2] / 255, THREE.SRGBColorSpace);
   const top = new THREE.MeshBasicMaterial({ color });
   const wall = new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.55) });
-  const geo = new THREE.BoxGeometry(side, side, lift);
+  const lift = strong ? 0.7 : 0.45;
+  const geo = new THREE.BoxGeometry(1, 1, lift);
+  geo.translate(0, 0, lift / 2);
   const box = new THREE.Mesh(geo, [wall, wall, wall, wall, top, top]);
-  const edges = new THREE.LineSegments(
-    new THREE.EdgesGeometry(geo),
-    new THREE.LineBasicMaterial({ color: 0xf6f7f9 }),
-  );
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xf6f7f9 }));
   // Offset ground shadow: from straight above it is what makes the cell read as lifted.
   const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(side * 1.12, side * 1.12),
+    new THREE.PlaneGeometry(1.12, 1.12),
     new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false }),
   );
-  shadow.position.set(side * 0.16, -side * 0.16, -lift / 2);
+  shadow.position.set(0.16, -0.16, 0);
   const group = new THREE.Group();
   group.add(shadow, box, edges);
-  group.applyMatrix4(frameAt(sample.x, sample.y, MARK_R + lift / 2));
+  group.matrixAutoUpdate = false;
+  group.userData = { frame: frameAt(sample.x, sample.y, MARK_R), k: strong ? 1.35 : 1.2 };
   group.renderOrder = 5;
   overlay.add(group);
+  sizeTile(group);
   return group;
+}
+
+const tileScale = new THREE.Matrix4();
+function sizeTile(group) {
+  if (!group) return;
+  const side = markerPx() * pxWorld() * group.userData.k;
+  group.matrix.copy(group.userData.frame).multiply(tileScale.makeScale(side, side, side));
+  group.matrixWorldNeedsUpdate = true;
 }
 
 function dropTile(slot) {
@@ -434,29 +550,35 @@ function showReadout(sample, pinned) {
     return;
   }
   box.hidden = false;
+  const est = Boolean(sample.estimate);
   $("readout-chip").style.background = `rgb(${sample.rgba[0]},${sample.rgba[1]},${sample.rgba[2]})`;
-  $("readout-title").textContent = sample.induced
-    ? "Induced cell"
+  $("readout-chip").style.opacity = est ? "0.6" : "1";
+  $("readout-title").textContent = est
+    ? "Estimate — not scored"
     : sample.is_best ? "Best evaluated cell" : "Evaluated cell";
   $("readout-lat").textContent = fmtLat(sample.lat_deg);
   $("readout-lon").textContent = fmtLon(sample.lon_deg);
-  $("readout-score").textContent = sample.induced
-    ? "not scored"
+  $("readout-score-label").textContent = est ? "Estimated score" : "Score";
+  $("readout-score").textContent = est
+    ? sample.feasible ? `≈ ${sample.score.toFixed(2)}` : "likely infeasible"
     : sample.feasible ? Number(sample.score).toFixed(3) : "0 · infeasible";
-  $("readout-note").textContent = sample.induced
-    ? "Shown from the nearest evaluated cell to mark where the search moved."
+  $("readout-note").textContent = est
+    ? `Interpolated from ${sample.n} evaluated cell${sample.n === 1 ? "" : "s"}; the nearest is ${(sample.dMin * MOON_R_KM).toFixed(1)} km away. The search did not evaluate this spot` +
+      (pinned ? " — open it in the planner to score it." : ". Click to pin.")
     : !sample.feasible && sample.marker_t != null
-      ? `Relative badness in this query: ${Math.round(100 * (1 - sample.marker_t))} % (dot size).`
+      ? `Does not meet the mission needs. Relative badness in this query: ${Math.round(100 * (1 - sample.marker_t))} %.`
       : pinned ? "" : "Click to pin this cell.";
   $("readout-note").hidden = !$("readout-note").textContent;
+  $("open-planner").textContent = est ? "Evaluate in planner" : "Open in planner";
   $("readout-actions").hidden = !pinned;
 }
 
 function setHovered(sample) {
   if (sample === hovered) return;
+  if (sample?.estimate && hovered?.estimate && sample.key === hovered.key) return;
   hovered = sample;
   dropTile("hover");
-  if (sample && sample !== selected) tiles.hover = makeTile(sample, false);
+  if (sample && !sample.estimate && sample !== selected) tiles.hover = makeTile(sample, false);
   canvas.classList.toggle("over-cell", Boolean(sample));
   const shown = sample ?? selected;
   showReadout(shown, Boolean(shown) && shown === selected);
@@ -466,16 +588,34 @@ function setSelected(sample) {
   selected = sample;
   dropTile("selected");
   dropTile("hover");
-  if (sample) tiles.selected = makeTile(sample, true);
+  if (sample && !sample.estimate) tiles.selected = makeTile(sample, true);
   showReadout(sample, Boolean(sample));
+  for (const li of $("top-list").children) li.classList.toggle("active", li.sample === sample);
 }
 
-/* ---------- picking ---------- */
+/* ---------- picking: evaluated cells first (D-2325) ---------- */
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const unitSphere = new THREE.Sphere(new THREE.Vector3(), 1);
 const hit = new THREE.Vector3();
+
+function estimateSample(x, y) {
+  const est = data.estimate;
+  if (!est || evaluatedOnly()) return null;
+  const e = estimateAt(x, y, est.reach);
+  if (!e) return null;
+  const rho = Math.hypot(x, y);
+  const lat = (2 * Math.atan(rho / 2) * 180) / Math.PI - 90;
+  const lon = (((Math.atan2(x, y) * 180) / Math.PI) % 360 + 360) % 360;
+  return {
+    estimate: true,
+    key: `${Math.round(x / (0.25 * CELL))},${Math.round(y / (0.25 * CELL))}`,
+    x, y, lat_deg: lat, lon_deg: lon,
+    feasible: e.feasible, score: e.score, n: e.n, dMin: e.dMin,
+    rgba: e.feasible ? scoreRgb(e.score) : INFEASIBLE_RGB,
+  };
+}
 
 function pickSample(clientX, clientY) {
   if (!data.samples.length) return null;
@@ -484,9 +624,10 @@ function pickSample(clientX, clientY) {
   raycaster.setFromCamera(pointer, camera);
   if (!raycaster.ray.intersectSphere(unitSphere, hit)) return null;
   const [x, y] = vec3ToStereo(hit);
-  // At least ~9 px on screen so sparse cells stay reachable when zoomed out.
-  const pxWorld = (2 * view.alt * Math.tan((FOV_DEG * Math.PI) / 360)) / r.height;
-  return nearestSample(x, y, Math.max(0.72 * data.cell, 9 * pxWorld));
+  // Snap to the nearest evaluated cell within a generous screen radius; only when none is that
+  // close does the pointer read the estimate layer.
+  const w = pxWorld();
+  return nearestSample(x, y, Math.max(PICK_PX * w, 0.6 * markerPx() * w)) ?? estimateSample(x, y);
 }
 
 let downAt = null;
@@ -505,6 +646,39 @@ canvas.addEventListener("click", (ev) => {
   if (downAt && Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 4) return; // was a drag
   setSelected(pickSample(ev.clientX, ev.clientY));
 });
+
+/* ---------- best evaluated cells list (D-2325) ---------- */
+
+function buildTopList() {
+  const list = $("top-list");
+  list.replaceChildren();
+  const top = data.samples.filter((s) => s.feasible).sort((a, b) => b.score - a.score).slice(0, TOP_N);
+  $("top-panel").hidden = top.length === 0;
+  $("top-count").textContent = String(top.length);
+  top.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.sample = s;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    const chip = document.createElement("i");
+    chip.style.background = `rgb(${s.rgba[0]},${s.rgba[1]},${s.rgba[2]})`;
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = `${i + 1}`;
+    const score = document.createElement("b");
+    score.textContent = Number(s.score).toFixed(3);
+    const where = document.createElement("span");
+    where.className = "where";
+    where.textContent = `${Math.abs(s.lat_deg).toFixed(2)}° S, ${fmtLon(s.lon_deg).replace(/(\.\d{2})\d+/, "$1")}`;
+    btn.append(rank, chip, score, where);
+    btn.addEventListener("click", () => {
+      setSelected(s);
+      flyTo(stereoToVec3(s.x, s.y), Math.min(view.alt, Math.max(0.02, 16 * data.spacing))); // ~12 spacings across
+    });
+    li.append(btn);
+    list.append(li);
+  });
+}
 
 /* ---------- camera ---------- */
 
@@ -534,7 +708,7 @@ function fitData(animate = true) {
   c.normalize();
   let ang = 0;
   for (const p of pts) ang = Math.max(ang, c.angleTo(p));
-  const span = 2 * Math.max(ang + 2.5 * data.cell, 4 * data.cell);
+  const span = 2 * Math.max(ang + 1.5 * data.spacing, 4 * CELL);
   const aspect = Math.min(1, camera.aspect);
   const alt = (span * 1.35) / (2 * Math.tan((FOV_DEG * Math.PI) / 360) * aspect);
   if (animate) flyTo(c, alt);
@@ -596,6 +770,12 @@ function tick(now) {
   camera.far = view.alt + 2.5;
   camera.updateProjectionMatrix();
   camera.lookAt(0, 0, 0);
+  if (markers) {
+    const range = renderer.getContext().getParameter(renderer.getContext().ALIASED_POINT_SIZE_RANGE);
+    markers.material.uniforms.uSize.value = Math.min(range[1], markerPx() * renderer.getPixelRatio());
+  }
+  sizeTile(tiles.hover);
+  sizeTile(tiles.selected);
   renderer.render(scene, camera);
   updateBestPin();
 }
@@ -605,33 +785,36 @@ function tick(now) {
 function showSamples(payload, label) {
   clearOverlay();
   setSelected(null);
-  const samples = (payload.samples || []).map((s) => {
+  // Evaluated cells only: the API's four-neighbour induced copies are superseded by the
+  // estimate layer (D-1df2) and no longer drawn.
+  const samples = (payload.samples || []).filter((s) => !s.induced).map((s) => {
     const [x, y] = latLonToStereo(s.lat_deg, s.lon_deg);
     return { ...s, x, y };
   });
-  const cell = estimateCell(samples);
-  data = { samples, cell, hash: buildHash(samples, cell), best: samples.find((s) => s.is_best) ?? null };
+  data = { samples, spacing: CELL, hash: new Map(), best: null, ceiling: Number(payload.score_ceiling ?? 1.4), estimate: null };
+  data.spacing = estimateSpacing(samples);
+  data.hash = buildHash(samples, data.spacing);
+  data.best = samples.find((s) => s.is_best) ?? null;
 
-  const ceiling = Number(payload.score_ceiling ?? 1.4);
-  $("ramp-mid").textContent = (ceiling / 2).toFixed(1);
-  $("ramp-max").textContent = `${ceiling.toFixed(1)}+`;
-  $("legend-induced").hidden = !(payload.n_induced > 0);
+  $("ramp-mid").textContent = (data.ceiling / 2).toFixed(1);
+  $("ramp-max").textContent = `${data.ceiling.toFixed(1)}+`;
+  $("legend-infeasible").hidden = !samples.some((s) => !s.feasible);
   $("empty").hidden = samples.length > 0;
   if (data.best) $("best-pin-label").textContent = `Best ${Number(data.best.score).toFixed(2)}`;
+  buildTopList();
 
   if (!samples.length) {
     setStatus("No cells in this result");
     return;
   }
-  buildField();
-  buildInfeasibleDots();
+  buildEstimate();
+  buildMarkers();
   fitData(true);
 
-  const n = payload.n_evaluated ?? samples.length;
-  const ni = payload.n_induced ?? 0;
+  const nFeasible = samples.filter((s) => s.feasible).length;
   setStatus(
-    `${label ? label + " · " : ""}${n} evaluated${ni ? ` + ${ni} induced` : ""} · ` +
-      (payload.search_partial ? "partial search" : "full coverage"),
+    `${label ? label + " · " : ""}${samples.length} evaluated cells (${nFeasible} feasible) · ` +
+      (payload.search_partial ? "partial search — the rest is estimated, not scored" : "full coverage"),
   );
 }
 
@@ -716,6 +899,25 @@ function openSite(target) {
 $("open-planner").addEventListener("click", () => openSite("planner"));
 $("open-firstperson").addEventListener("click", () => openSite("firstperson"));
 $("load-demo").addEventListener("click", () => loadDemo());
+
+try {
+  $("evaluated-only").checked = localStorage.getItem("clps:mapEvaluatedOnly") === "1";
+} catch (_) {
+  /* storage blocked */
+}
+$("evaluated-only").addEventListener("change", () => {
+  const only = evaluatedOnly();
+  try {
+    localStorage.setItem("clps:mapEvaluatedOnly", only ? "1" : "0");
+  } catch (_) {
+    /* storage blocked */
+  }
+  if (data.estimate) data.estimate.mesh.visible = !only;
+  $("legend-estimate").hidden = only;
+  if (hovered?.estimate) setHovered(null);
+  if (selected?.estimate) setSelected(null);
+});
+$("legend-estimate").hidden = evaluatedOnly();
 
 resize();
 new ResizeObserver(resize).observe(host);

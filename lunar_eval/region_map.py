@@ -1,6 +1,7 @@
 """S9 region score map: colour scale, infeasible markers, induction, payload.
 
-per D-20261115-pj-85bf, D-20261115-pj-8acb, D-20261115-pj-7227, D-20261115-pj-48ee.
+per D-20261115-pj-85bf, D-20261115-pj-7227, D-20261115-pj-48ee, D-20261116-pj-2325
+(infeasible colour; supersedes the black of D-8acb, keeps its relative-badness marker).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from lunar_eval.horizon.mask import R_M
 
 SCORE_CEILING = 1.4  # per D-7227 D-48ee (1.0 * (1 + 0.40))
 INDUCED_OPACITY = 0.45  # per D-85bf
+INFEASIBLE_RGB = (176, 131, 240)  # violet: off the score ramp and off the Moon; per D-2325
 EVALUATED_OPACITY = 1.0
 INDUCE_RADIUS_KM = 1.0  # one cap cell step; per D-85bf
 
@@ -46,10 +48,10 @@ def sample_rgba(
     companion_score: float | None = None,
     infeasible_companions: list[float] | None = None,
 ) -> tuple[int, int, int, float]:
-    """RGBA for one map sample. per D-8acb / D-85bf."""
+    """RGBA for one map sample. per D-2325 / D-85bf."""
     opacity = INDUCED_OPACITY if induced else EVALUATED_OPACITY
     if not feasible:
-        return 0, 0, 0, opacity
+        return (*INFEASIBLE_RGB, opacity)
     r, g, b = feasible_score_to_rgb(score)
     return r, g, b, opacity
 

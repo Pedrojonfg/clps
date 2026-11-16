@@ -5,7 +5,7 @@ kind: task
 owner: pj
 branch: fix/visualizations-ui
 created: 2026-11-16T21:45:00Z
-stage: build
+stage: review
 relates: [T-20261115-pj-33ca, T-20261115-pj-2b7a, T-20261114-pj-9e03, T-20261114-pj-03a6]
 ---
 # Rework the result visualizations after pj's UI review
@@ -44,3 +44,16 @@ pj to accept or reject `D-20261116-pj-1df2` (estimate layer) and to review the d
 ## Out of scope
 
 - Own DEM-based terrain for the first-person view; removing API-side induction before pj rules on the estimate layer; changing the red–yellow–green ramp.
+
+## Build
+
+2026-11-16, unattended pass.
+
+- Planner: `SiteCharts.tsx` (score on the absolute scale, needs-versus-actual bars, horizon panorama, visibility timeline with a shared time cursor) and `LocalSearchBoard.tsx` (strip of every evaluated start, top-10 table, "Use this start"). `PolarChart.tsx` removed.
+- API: mock `/site` builds its fractions with the real `sun_fraction` code, stores its mask in the real azimuth convention and returns a `local_search` block when asked; both payloads carry `mask.azimuth_zero_deg` / `azimuth_sign`.
+- First-person: play/pause, speed, follow, interpolated time; backdrop brightness from our Sun-disc fraction; status chips, compass strip and time strip; native-resolution MSAA rendering and finer tiles.
+- Region map: point markers with a minimum on-screen size, violet infeasibles, pointer snapping within 24 px, best-cells list, "Evaluated cells only" toggle, four-quadrant estimate layer.
+
+Checked in headless Chromium (software WebGL) against the mock and against real Site01 data: with real data the mask line in the first-person view follows the Cesium terrain horizon, and the planner panorama agrees with the scored series. `pytest` green (1 skipped, as before); desktop `tsc` + `vite build` and `deploy/build-demo.sh` pass.
+
+Not checked: frame rate and tile loading on a real GPU (the test browser renders in software and never finished refining terrain); estimate error against a total-coverage run (the validation named in `D-20261116-pj-1df2`).

@@ -104,6 +104,9 @@ def build_planner_payload(
         "data_source": "real",
         "mask": {
             "elevation_deg": np.asarray(horizon.elevation_deg, dtype=float).tolist(),
+            # per D-20261116-pj-b43a: geographic_az = zero + sign * index_az
+            "azimuth_zero_deg": 180.0,
+            "azimuth_sign": -1,
             "schedule_version": horizon.schedule_version,
             "lat": site.lat_deg,
             "lon": site.lon_deg,

@@ -209,14 +209,161 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        flex: 1 1 18rem;
-        max-width: 30rem;
+        flex: 8 1 24rem;
+      }
+
+      #scrub-track {
+        flex: 1;
+        min-width: 8rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
       }
 
       #hour-scrub input[type="range"] {
-        flex: 1;
-        min-width: 6rem;
+        width: 100%;
+        margin: 0;
         accent-color: #4c90f0;
+      }
+
+      #time-strip {
+        width: 100%;
+        height: 16px;
+        display: block;
+      }
+
+      select {
+        font: inherit;
+        font-size: 12px;
+        color: #f6f7f9;
+        background: #383e47;
+        border: 1px solid #5f6b7c;
+        border-radius: 4px;
+        padding: 2px 4px;
+      }
+
+      #play-toggle {
+        min-width: 5.2rem;
+        background: #2d72d2;
+        border-color: #2d72d2;
+      }
+
+      #play-toggle:hover {
+        background: #215db0;
+      }
+
+      /* per D-08e8: always-visible Sun / Earth-link state, in words + icon + colour */
+      #hud {
+        position: absolute;
+        z-index: 2;
+        top: 8px;
+        right: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-end;
+        pointer-events: none;
+      }
+
+      .chip {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 8px;
+        align-items: center;
+        min-width: 15.5rem;
+        padding: 6px 10px;
+        background: rgba(28, 33, 39, 0.88);
+        border: 1px solid #5f6b7c;
+        border-left-width: 4px;
+        border-radius: 4px;
+        font-size: 13px;
+        color: #f6f7f9;
+      }
+
+      .chip .chip-icon {
+        font-size: 15px;
+        width: 1.2em;
+        text-align: center;
+      }
+
+      .chip .chip-bar {
+        grid-column: 1 / -1;
+        height: 3px;
+        background: #383e47;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .chip .chip-bar i {
+        display: block;
+        height: 100%;
+        width: 0;
+      }
+
+      .chip.ok {
+        border-left-color: #72ca9b;
+      }
+
+      .chip.ok .chip-icon {
+        color: #72ca9b;
+      }
+
+      .chip.off {
+        border-left-color: #fa999c;
+      }
+
+      .chip.off .chip-icon {
+        color: #fa999c;
+      }
+
+      #chip-sun .chip-bar i {
+        background: #c9a227;
+      }
+
+      #chip-earth .chip-bar i {
+        background: #6a8faa;
+      }
+
+      #compass {
+        position: absolute;
+        z-index: 2;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(34rem, calc(100% - 36rem));
+        min-width: 14rem;
+        height: 40px;
+        background: rgba(28, 33, 39, 0.78);
+        border: 1px solid #404854;
+        border-radius: 4px;
+        pointer-events: none;
+      }
+
+      #terrain-loading {
+        position: absolute;
+        z-index: 2;
+        left: 50%;
+        bottom: 34px;
+        transform: translateX(-50%);
+        padding: 2px 8px;
+        background: rgba(28, 33, 39, 0.85);
+        border-radius: 4px;
+        font-size: 12px;
+        color: #abb3bf;
+        pointer-events: none;
+      }
+
+      .strip-key {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+      }
+
+      .strip-key i {
+        width: 12px;
+        height: 6px;
+        border-radius: 1px;
       }
 
       #hour-label {
@@ -244,11 +391,19 @@
       <div id="stage">
         <div id="cesiumContainer" hidden></div>
         <canvas id="fallback-canvas" hidden aria-label="2D horizon mask panorama with Sun and Earth tracks"></canvas>
+        <canvas id="compass" hidden aria-label="Compass strip: where the Sun and the Earth are relative to the current heading"></canvas>
+        <div id="hud" hidden aria-live="polite">
+          <div class="chip" id="chip-sun"><span class="chip-icon" aria-hidden="true"></span><span class="chip-text"></span><span class="chip-bar"><i></i></span></div>
+          <div class="chip" id="chip-earth"><span class="chip-icon" aria-hidden="true"></span><span class="chip-text"></span><span class="chip-bar"><i></i></span></div>
+        </div>
+        <div id="terrain-loading" hidden>Loading finer terrain…</div>
         <div id="details" hidden>
           <ul>
             <li><strong>Ours:</strong> the horizon mask line and the Sun and Earth positions for this site and time — the same series the planner scores.</li>
             <li><strong>Not ours:</strong> Cesium Moon terrain and imagery (Cesium ion asset 2684829; NASA / USGS sources via Cesium). Visual context only: it is not the mask and not the score.</li>
-            <li><strong>Backdrop look:</strong> brightened and lit from our Sun azimuth at a fixed angle so relief reads; it is not a shadow or illumination model.</li>
+            <li><strong>Brightness:</strong> the backdrop is scaled by our visible Sun-disc fraction (the series the planner scores), down to a dim floor at night. It is lit from our Sun azimuth at a fixed angle so relief reads. No shadows are cast; it is not an illumination model.</li>
+            <li><strong>Earth link:</strong> line of sight to the Earth above our horizon mask, by the planner's Earth threshold — not a radio link budget.</li>
+            <li><strong>Playback:</strong> positions between the hourly samples are interpolated; only the hourly samples are scored.</li>
             <li><strong>Observer:</strong> 2 m above the surface, look-around only.</li>
             <li><strong>Attribution:</strong> Cesium ion, NASA, USGS as shown in the on-view credits.</li>
           </ul>
@@ -258,8 +413,25 @@
       <footer class="bar">
         <div class="row">
           <div id="hour-scrub" hidden>
-            <label for="hour-range">Time</label>
-            <input type="range" id="hour-range" min="0" max="0" value="0" step="1" />
+            <button type="button" id="play-toggle" aria-pressed="false" title="Play or pause (Space)">▶ Play</button>
+            <select id="speed-select" aria-label="Playback speed">
+              <option value="1">1 h/s</option>
+              <option value="2" selected>2 h/s</option>
+              <option value="6">6 h/s</option>
+              <option value="12">12 h/s</option>
+            </select>
+            <span id="follow-wrap" hidden>
+              <label for="follow-select">Follow</label>
+              <select id="follow-select">
+                <option value="off" selected>off</option>
+                <option value="sun">Sun</option>
+                <option value="earth">Earth</option>
+              </select>
+            </span>
+            <div id="scrub-track">
+              <input type="range" id="hour-range" min="0" max="0" value="0" step="any" aria-label="Time in the window" />
+              <canvas id="time-strip" aria-label="Hour by hour: Sun-disc fraction (top) and Earth link (bottom)"></canvas>
+            </div>
             <output id="hour-label" for="hour-range">—</output>
           </div>
           <span class="spacer"></span>
@@ -271,6 +443,8 @@
           <span class="key earth"><i></i>Earth <b id="earth-state">—</b></span>
           <button type="button" id="face-earth" hidden>Face Earth</button>
           <span class="spacer"></span>
+          <span class="strip-key"><i style="background:#c9a227"></i>strip top: Sun disc</span>
+          <span class="strip-key"><i style="background:#6a8faa"></i>bottom: Earth link</span>
           <span class="key mask"><i></i>Our horizon mask</span>
         </div>
       </footer>

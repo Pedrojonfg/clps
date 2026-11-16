@@ -1,7 +1,7 @@
 """S9 region score map: colour scale, infeasible markers, induction, payload.
 
 per D-20261115-pj-85bf (paint evaluated; induce only under partial search),
-D-20261115-pj-8acb (infeasible black + in-query relative dots),
+D-20261116-pj-2325 (infeasible violet, not black; in-query relative dots kept from D-8acb),
 D-20261115-pj-7227 (absolute continuous RYG, clamp above ceiling to green),
 D-20261115-pj-48ee (ceiling 1.0 * (1 + 0.40)).
 D-834a (interpolate/lift) and D-4126 (3D canvas) are UI-only: no unit tests here.
@@ -18,6 +18,7 @@ from lunar_eval.region_map import (
     EVALUATED_OPACITY,
     INDUCE_RADIUS_KM,
     INDUCED_OPACITY,
+    INFEASIBLE_RGB,
     SCORE_CEILING,
     build_region_map,
     feasible_score_to_rgb,
@@ -136,15 +137,15 @@ def test_sample_rgba_feasible_induced():
     assert a == INDUCED_OPACITY  # per D-85bf
 
 
-def test_sample_rgba_infeasible_black_evaluated():
+def test_sample_rgba_infeasible_violet_evaluated():
     r, g, b, a = sample_rgba(1.2, False)  # score ignored for fill
-    assert (r, g, b) == (0, 0, 0)  # per D-8acb infeasible black
+    assert (r, g, b) == INFEASIBLE_RGB  # per D-2325 infeasible violet
     assert a == EVALUATED_OPACITY
 
 
-def test_sample_rgba_infeasible_black_induced():
+def test_sample_rgba_infeasible_violet_induced():
     r, g, b, a = sample_rgba(1.2, False, induced=True)
-    assert (r, g, b) == (0, 0, 0)
+    assert (r, g, b) == INFEASIBLE_RGB
     assert a == INDUCED_OPACITY
 
 
@@ -306,7 +307,7 @@ def test_build_rgba_matches_sample_rgba():
     by_lon = {s["lon_deg"]: s for s in out["samples"]}
     assert tuple(by_lon[0.0]["rgba"][:3]) == feasible_score_to_rgb(0.7)
     assert by_lon[0.0]["rgba"][3] == EVALUATED_OPACITY
-    assert tuple(by_lon[90.0]["rgba"][:3]) == (0, 0, 0)  # per D-8acb
+    assert tuple(by_lon[90.0]["rgba"][:3]) == INFEASIBLE_RGB  # per D-2325
     assert by_lon[90.0]["rgba"][3] == EVALUATED_OPACITY
 
 
@@ -323,12 +324,12 @@ def test_build_partial_adds_induced():
     assert evaluated[0]["rgba"][3] == EVALUATED_OPACITY
 
 
-def test_build_partial_induced_infeasible_is_black_translucent():
+def test_build_partial_induced_infeasible_is_violet_translucent():
     out = build_region_map(
         [_row(score=0.0, feasible=False, companion=0.4)], search_partial=True
     )
     for s in (s for s in out["samples"] if s["induced"]):
-        assert s["rgba"][:3] == [0, 0, 0]  # per D-8acb
+        assert s["rgba"][:3] == list(INFEASIBLE_RGB)  # per D-2325
         assert s["rgba"][3] == INDUCED_OPACITY
 
 
