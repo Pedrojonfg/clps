@@ -4,7 +4,8 @@ title: "Infeasible cells black with in-query badness dots; feasibles use UI scor
 date: 2026-11-15T10:49:59Z
 author: pj
 decided-by: pj
-status: accepted
+status: superseded
+superseded-by: D-20261116-pj-2325
 mode: own
 domain: claims & interpretation
 task: T-20261115-pj-33ca
