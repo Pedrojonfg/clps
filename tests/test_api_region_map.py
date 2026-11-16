@@ -84,3 +84,23 @@ def test_region_map_empty_rows():
     assert r.status_code == 200
     p = r.json()
     assert p["samples"] == [] and p["n_evaluated"] == 0
+
+
+def test_deep_search_mock_needs_no_data_and_is_flagged():
+    body = {
+        "mock": True,
+        "mode": "total_coverage",
+        "lat_min": -90,
+        "lat_max": -80,
+        "lon_min": 0,
+        "lon_max": 360,
+        "start": "2027-01-01T00:00:00Z",
+        "end": "2027-01-02T00:00:00Z",
+    }
+    r = client.post("/deep-search", json=body)
+    assert r.status_code == 200
+    p = r.json()
+    assert p["data_source"] == "mock" and p["claim"] == "grid_optimum"
+    assert p["rows_evaluated"] == len(p["export_rows"]) > 1000
+    assert any(x["feasible"] for x in p["export_rows"]) and any(not x["feasible"] for x in p["export_rows"])
+    assert client.post("/deep-search", json={**body, "mode": "optimized"}).json()["rows_evaluated"] < p["rows_evaluated"]
