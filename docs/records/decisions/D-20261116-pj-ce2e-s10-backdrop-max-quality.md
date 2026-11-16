@@ -12,6 +12,8 @@ concepts: [third-party backdrop resolution limit]
 supersedes: []
 relates: [D-20261115-pj-7d58, D-20261115-pj-671e]
 ai: delegated-by-pj
+accepted-by: pj
+accepted: 2026-11-16T22:26:00Z
 ---
 # First-person backdrop renders at the highest quality the Cesium Moon asset gives
 ## Context
@@ -34,6 +36,14 @@ Push the renderer settings to the asset's limit; say plainly where the limit is.
 ## Rationale
 
 The ceiling is the asset: from a 2 m eye the ground is far coarser than our 5 m DEMs, so close ground stays soft whatever the renderer does. Within that, native-resolution rendering, multisampling and the finest tile selection remove the blur and stair-stepping that settings caused. Option 2 is the real path to a better picture and is recorded as the follow-up.
+
+## Ownership and delegation
+
+Added 2026-11-16T22:26:00Z, when pj accepted this record.
+
+- **What pj decided.** The product, its concepts and all the mathematics behind this view are pj's own decisions: the score and its feasibility rules, the visible-disc series, the horizon mask and the absolute score scale are recorded in pj's own decision records. pj also decided that this part of the interface needed to change, and what it had to achieve.
+- **What pj delegated.** The form of the interface. pj delegated it because interface design is outside pj's area of expertise and pj did not consider it necessary to take these decisions personally. The options, the choice and the values in this record were made by the AI.
+- **Status of the acceptance.** pj accepts this record knowing that pj did not take these decisions. pj plans to review them and to change whatever pj sees fit later. Any such change must be a new decision record that references this one.
 
 ## Checks raised
 

@@ -12,6 +12,8 @@ concepts: [sky chart form, need versus actual]
 supersedes: []
 relates: [D-20261114-pj-aa58, D-20261115-pj-b6fe, D-20261116-pj-b43a]
 ai: delegated-by-pj
+accepted-by: pj
+accepted: 2026-11-16T22:26:00Z
 ---
 # Planner result view: horizon panorama, visibility timeline and needs-versus-actual
 ## Context
@@ -35,6 +37,14 @@ The view has to answer three questions in order: is this site×time feasible and
 ## Rationale
 
 The panorama is the view an observer has when turning around, and it is the same picture the first-person screen falls back to (`D-ac74`), so the two screens teach the same reading. The timeline puts visible Sun-disc fraction and Earth visibility on a real time axis, where the longest night and the longest no-Earth gap can be marked directly. The needs-versus-actual bars show each mission need against the value achieved, which is what the score's feasibility is made of.
+
+## Ownership and delegation
+
+Added 2026-11-16T22:26:00Z, when pj accepted this record.
+
+- **What pj decided.** The product, its concepts and all the mathematics behind this view are pj's own decisions: the score and its feasibility rules, the visible-disc series, the horizon mask and the absolute score scale are recorded in pj's own decision records. pj also decided that this part of the interface needed to change, and what it had to achieve.
+- **What pj delegated.** The form of the interface. pj delegated it because interface design is outside pj's area of expertise and pj did not consider it necessary to take these decisions personally. The options, the choice and the values in this record were made by the AI.
+- **Status of the acceptance.** pj accepts this record knowing that pj did not take these decisions. pj plans to review them and to change whatever pj sees fit later. Any such change must be a new decision record that references this one.
 
 ## Checks raised
 

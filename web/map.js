@@ -4,7 +4,7 @@
  * solid cell on focus, D-85bf paint what the search evaluated.
  * 2026-11-16 — D-2325: evaluated cells are markers with a minimum on-screen size, infeasibles
  * are violet (not black), the pointer snaps to the nearest evaluated cell, best-cells list.
- * D-1df2 (proposed): a distance-faded estimate layer fills between evaluated cells by
+ * D-1df2: a distance-faded estimate layer fills between evaluated cells by
  * four-quadrant inverse distance; it replaces drawing the API's four-neighbour induced copies.
  *
  * Everything that is data lives in south-polar stereographic metres (the cap grid of
@@ -390,7 +390,7 @@ function buildMarkers() {
   overlay.add(markers);
 }
 
-/* ---------- estimate layer between evaluated cells (D-1df2, proposed) ---------- */
+/* ---------- estimate layer between evaluated cells (D-1df2) ---------- */
 
 /**
  * Four-quadrant inverse distance (the rule of D-affb): the nearest evaluated cell in each
