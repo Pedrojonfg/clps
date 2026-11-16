@@ -4,60 +4,142 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Region score map — lunar south pole</title>
-  <!--
-    Moon texture: 2k_moon.jpg from Solar System Scope textures collection
-    (https://www.solarsystemscope.com/textures/) — free for use with attribution;
-  vendored at assets/moon.jpg (~1.1 MB). per D-4126 real Moon imagery, not a blank sphere.
-  -->
+    <!--
+      Textures (per D-4126: real Moon imagery, public-domain / NASA-derived):
+      - assets/moon.jpg: 2k_moon.jpg, Solar System Scope textures (free with attribution).
+      - assets/southpole_80s.jpg, southpole_87s.jpg: hillshade of NASA LOLA south-pole DEMs
+        (PGDA), built by scripts/build_polar_textures.py.
+      Look follows the Blueprint dark theme of the desktop shell (D-01b0, D-b6fe).
+    -->
     <style>
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0;
-        font-family: system-ui, sans-serif;
-        background: #0a0b0f;
-        color: #d8dce6;
+        font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: #111418;
+        color: #f6f7f9;
         overflow: hidden;
       }
-      #toolbar {
+      #canvas-host { position: fixed; inset: 0; }
+      #canvas-host canvas { display: block; cursor: grab; }
+      #canvas-host canvas.dragging { cursor: grabbing; }
+      #canvas-host canvas.over-cell { cursor: pointer; }
+
+      .panel {
         position: absolute;
         z-index: 2;
-        top: 0;
+        background: #252a31;
+        border: 1px solid #404854;
+        border-radius: 4px;
+        padding: 8px 10px;
+        font-size: 12px;
+        color: #abb3bf;
+      }
+      .panel strong { color: #f6f7f9; font-weight: 600; }
+
+      #status-panel { top: 10px; left: 10px; max-width: min(34rem, calc(100% - 20px)); display: flex; gap: 10px; align-items: center; }
+      #status.err { color: #fa999c; }
+      #back-link { color: #8abbff; white-space: nowrap; }
+
+      button {
+        font: inherit;
+        color: #f6f7f9;
+        background: #383e47;
+        border: 1px solid #5f6b7c;
+        border-radius: 4px;
+        padding: 4px 9px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:hover { background: #404854; }
+      button.primary { background: #2d72d2; border-color: #2d72d2; }
+      button.primary:hover { background: #215db0; }
+
+      #view-controls { right: 10px; bottom: 34px; display: flex; gap: 6px; padding: 6px; }
+      #view-controls button { min-width: 28px; }
+
+      #legend { left: 10px; bottom: 34px; width: 250px; }
+      #legend h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: #f6f7f9; }
+      /* Data ramp, not decoration: the absolute score scale of D-7227. */
+      #ramp { height: 10px; border-radius: 2px; background: linear-gradient(90deg, rgb(255,0,0), rgb(255,255,0) 50%, rgb(0,255,0)); }
+      #ramp-ticks { display: flex; justify-content: space-between; margin: 2px 0 8px; font-variant-numeric: tabular-nums; }
+      .legend-row { display: flex; gap: 8px; align-items: flex-start; margin-top: 5px; }
+      .legend-row[hidden] { display: none; }
+      .swatch { flex: none; width: 14px; height: 14px; margin-top: 1px; border-radius: 2px; border: 1px solid #5f6b7c; position: relative; }
+      .swatch.infeasible { background: #000; }
+      .swatch.infeasible::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #f6f7f9; }
+      .swatch.induced { background: rgba(255, 255, 0, 0.35); }
+      .swatch.best { border: 2px solid #f6f7f9; border-radius: 50%; background: transparent; }
+
+      #readout { top: 10px; right: 10px; width: 250px; }
+      #readout[hidden] { display: none; }
+      #readout h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: #f6f7f9; display: flex; align-items: center; gap: 8px; }
+      #readout-chip { width: 14px; height: 14px; border-radius: 2px; border: 1px solid #5f6b7c; flex: none; }
+      #readout dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+      #readout dt { color: #abb3bf; }
+      #readout dd { margin: 0; color: #f6f7f9; font-variant-numeric: tabular-nums; text-align: right; }
+      #readout-note { margin: 6px 0 0; }
+      #readout-actions { display: flex; gap: 6px; margin-top: 8px; }
+      #readout-actions[hidden] { display: none; }
+
+      #best-pin {
+        position: absolute;
+        z-index: 1;
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        width: 22px;
+        height: 22px;
+        border: 2px solid #f6f7f9;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px #111418, inset 0 0 0 1px #111418;
+      }
+      #best-pin[hidden] { display: none; }
+      #best-pin span {
+        position: absolute;
+        left: 50%;
+        top: -22px;
+        transform: translateX(-50%);
+        padding: 1px 6px;
+        background: #252a31;
+        border: 1px solid #404854;
+        border-radius: 4px;
+        font-size: 11px;
+        color: #f6f7f9;
+        white-space: nowrap;
+      }
+
+      #empty {
+        position: absolute;
+        z-index: 2;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        max-width: 22rem;
+        padding: 14px 16px;
+        font-size: 13px;
+      }
+      #empty[hidden] { display: none; }
+      #empty strong { display: block; margin-bottom: 4px; font-size: 14px; }
+      #empty button { margin-top: 10px; }
+
+      #credits {
+        position: absolute;
+        z-index: 2;
         left: 0;
         right: 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem 1rem;
-        align-items: center;
-        padding: 0.6rem 0.75rem;
-        background: rgba(10, 11, 15, 0.82);
-        border-bottom: 1px solid #3f4556;
-        font-size: 0.85rem;
-      }
-      #toolbar a { color: #c9a227; }
-      #toolbar button {
-        font: inherit;
-        cursor: pointer;
-        padding: 0.35rem 0.65rem;
-        border: 1px solid #5c6378;
-        background: #2a2e38;
-        color: inherit;
-        border-radius: 3px;
-      }
-      #toolbar button:hover { border-color: #c9a227; }
-      #status { flex: 1; color: #9aa2b4; min-width: 8rem; }
-      #status.err { color: #e88; }
-      #canvas-host {
-        position: fixed;
-        inset: 0;
-      }
-      #hint {
-        position: absolute;
-        bottom: 0.5rem;
-        left: 0.75rem;
-        z-index: 2;
-        font-size: 0.75rem;
-        color: #5c6378;
+        bottom: 0;
+        margin: 0;
+        padding: 4px 10px;
+        background: #1c2127;
+        border-top: 1px solid #404854;
+        font-size: 11px;
+        color: #abb3bf;
         pointer-events: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
     </style>
     <script type="importmap">
@@ -70,13 +152,52 @@
     </script>
   </head>
   <body>
-    <header id="toolbar">
-      <a href="/">← Horizon planner</a>
-      <button type="button" id="load-demo">Load demo samples</button>
-      <span id="status">Drag to orbit · click a cell for site chart</span>
-    </header>
     <div id="canvas-host" aria-label="Orbitable 3D Moon score map"></div>
-    <p id="hint">Scores from POST /region-map · D-834a lift shows solid sample colour</p>
+
+    <div class="panel" id="status-panel">
+      <a id="back-link" href="/" hidden>← Horizon planner</a>
+      <span id="status">Loading…</span>
+    </div>
+
+    <div class="panel" id="readout" hidden aria-live="polite">
+      <h2><span id="readout-chip"></span><span id="readout-title"></span></h2>
+      <dl>
+        <dt>Latitude</dt><dd id="readout-lat"></dd>
+        <dt>Longitude</dt><dd id="readout-lon"></dd>
+        <dt>Score</dt><dd id="readout-score"></dd>
+      </dl>
+      <p id="readout-note"></p>
+      <div id="readout-actions" hidden>
+        <button type="button" class="primary" id="open-planner">Open in planner</button>
+        <button type="button" id="open-firstperson">First-person</button>
+      </div>
+    </div>
+
+    <div class="panel" id="legend">
+      <h2>Score · absolute scale</h2>
+      <div id="ramp" role="img" aria-label="Red at 0, yellow at mid scale, green at the score ceiling"></div>
+      <div id="ramp-ticks"><span>0</span><span id="ramp-mid">0.7</span><span id="ramp-max">1.4+</span></div>
+      <div class="legend-row"><span class="swatch infeasible"></span><span><strong>Infeasible</strong> — dot size is badness relative to this query only</span></div>
+      <div class="legend-row" id="legend-induced" hidden><span class="swatch induced"></span><span><strong>Induced</strong> — fainter cells next to evaluated ones; not scored</span></div>
+      <div class="legend-row"><span class="swatch best"></span><span><strong>Best</strong> evaluated cell</span></div>
+    </div>
+
+    <div class="panel" id="view-controls">
+      <button type="button" id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+      <button type="button" id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+      <button type="button" id="fit-data">Fit data</button>
+      <button type="button" id="whole-moon">Whole Moon</button>
+    </div>
+
+    <div class="panel" id="empty" hidden>
+      <strong>No search results to paint yet</strong>
+      <span id="empty-text">Run a region search to score cells around the active site.</span>
+      <div><button type="button" id="load-demo">Load demo samples</button></div>
+    </div>
+
+    <div id="best-pin" hidden><span id="best-pin-label">Best</span></div>
+
+    <p id="credits">Drag to orbit · scroll to zoom · hover a cell for its sample · Relief: NASA LOLA (PGDA) hillshade · Global: Solar System Scope</p>
     <script type="module" src="map.js"></script>
   </body>
 </html>
