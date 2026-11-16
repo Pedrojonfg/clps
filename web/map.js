@@ -637,7 +637,8 @@ function showSamples(payload, label) {
 
 async function postRegionMap(body) {
   if (STATIC) {
-    const res = await fetch("demo/region-map-demo.json");
+    // ?moon=1 → the exported whole-Moon mock search instead of the five hand-placed rows.
+    const res = await fetch(QUERY.get("moon") === "1" ? "demo/region-map-moon-mock.json" : "demo/region-map-demo.json");
     if (!res.ok) throw new Error(`demo data HTTP ${res.status}`);
     return res.json();
   }
@@ -659,7 +660,7 @@ async function loadDemo() {
   try {
     showSamples(
       await postRegionMap({ rows: DEMO_ROWS, search_partial: true, best: DEMO_ROWS[0] }),
-      "Demo samples",
+      QUERY.get("moon") === "1" ? "MOCK · Whole Moon total coverage" : "Demo samples",
     );
   } catch (e) {
     $("empty").hidden = false;

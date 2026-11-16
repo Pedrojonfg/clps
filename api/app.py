@@ -243,6 +243,7 @@ class DeepSearchBody(BaseModel):
     start_n: int | None = None
     hazards_enabled: bool = False
     format: str = Field(default="json", description="json | csv")
+    mock: bool = Field(default=False, description="Synthetic rows for UI checks; needs no kernels or cap index")
 
 
 def _iso_row(row: dict | None) -> dict | None:
@@ -258,6 +259,18 @@ def _iso_row(row: dict | None) -> dict | None:
 @app.post("/deep-search")
 def deep_search_endpoint(body: DeepSearchBody):
     # per D-60a3 dedicated endpoint; D-54f0 modes; D-c159 rect snap
+    if body.mock:
+        from lunar_eval.search.mock_deep import mock_deep_search
+
+        return mock_deep_search(
+            body.mode,
+            body.lat_min,
+            body.lat_max,
+            body.lon_min,
+            body.lon_max,
+            body.start,
+            body.window_hours,
+        )
     from lunar_eval.ephemeris import SpiceEphemeris
     from lunar_eval.horizon.cap_index import (
         cap_index_available,

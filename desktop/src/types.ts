@@ -109,6 +109,7 @@ export type RegionSearchSummary = {
   runtime_s: number;
   claim: string;
   provisional: boolean;
+  mock?: boolean;
   window_start: string;
   window_hours: number;
 };

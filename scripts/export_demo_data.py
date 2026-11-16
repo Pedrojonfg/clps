@@ -23,6 +23,38 @@ DEMO_ROWS = [
 ]
 
 
+def moon_mock_payload(client: TestClient) -> dict:
+    """Whole-Moon mock deep search (total coverage), painted through the real /region-map."""
+    search = client.post(
+        "/deep-search",
+        json={
+            "mock": True,
+            "mode": "total_coverage",
+            "lat_min": -90,
+            "lat_max": -80,
+            "lon_min": 0,
+            "lon_max": 360,
+            "start": "2027-01-01T00:00:00Z",
+            "end": "2027-01-02T00:00:00Z",
+        },
+    )
+    if search.status_code != 200:
+        raise SystemExit(f"deep-search mock failed: {search.status_code} {search.text[:300]}")
+    body = search.json()
+    rows = [
+        {
+            "lat_deg": r["site"]["lat_deg"],
+            "lon_deg": r["site"]["lon_deg"],
+            "score": r["score"],
+            "feasible": r["feasible"],
+            "companion_score": r["companion_score"],
+        }
+        for r in body["export_rows"]
+    ]
+    best = {"lat_deg": body["best"]["site"]["lat_deg"], "lon_deg": body["best"]["site"]["lon_deg"]}
+    return client.post("/region-map", json={"rows": rows, "search_partial": False, "best": best})
+
+
 def main(out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     client = TestClient(app)
@@ -33,6 +65,7 @@ def main(out_dir: Path) -> None:
             "/region-map",
             json={"rows": DEMO_ROWS, "search_partial": True, "best": DEMO_ROWS[0]},
         ),
+        "region-map-moon-mock.json": moon_mock_payload(client),
     }
     for name, res in responses.items():
         res.raise_for_status()

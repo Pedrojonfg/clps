@@ -61,9 +61,10 @@ export function firstPersonUrl(form: PlannerForm): string {
   return `${BASE}firstperson.html?${p.toString()}`;
 }
 
-export function regionMapUrl(form: PlannerForm, demo = false): string {
+export function regionMapUrl(form: PlannerForm, demo = false, moon = false): string {
   const p = new URLSearchParams(buildSiteQuery(form));
   if (demo || STATIC_DEMO) p.set("demo", "1");
+  if (moon) p.set("moon", "1");
   if (STATIC_DEMO) p.set("static", "1");
   return `${BASE}map.html?${p.toString()}`;
 }
@@ -86,6 +87,7 @@ export async function runRegionSearch(
   form: PlannerForm,
   rect: { lat_min: string; lat_max: string; lon_min: string; lon_max: string },
   mode: "optimized" | "total_coverage",
+  mock = false,
 ): Promise<RegionSearchSummary> {
   const start = toUtcIso(form.start);
   const end = toUtcIso(form.end);
@@ -108,6 +110,7 @@ export async function runRegionSearch(
       end,
       window_hours,
       template_id: form.template_id || null,
+      mock,
     }),
   });
   const body = await res.json().catch(() => ({}));
@@ -131,7 +134,9 @@ export async function runRegionSearch(
       rows,
       search_partial: body.mode !== "total_coverage",
       best,
-      label: body.mode === "total_coverage" ? "Total coverage" : "Optimized search",
+      label:
+        (body.data_source === "mock" ? "MOCK · " : "") +
+        (body.mode === "total_coverage" ? "Total coverage" : "Optimized search"),
     }),
   );
   return {
@@ -140,6 +145,7 @@ export async function runRegionSearch(
     runtime_s: body.runtime_s,
     claim: body.claim,
     provisional: Boolean(body.provisional),
+    mock: body.data_source === "mock",
     window_start: start.replace(":00Z", "Z").replace("T", " "),
     window_hours,
   };
