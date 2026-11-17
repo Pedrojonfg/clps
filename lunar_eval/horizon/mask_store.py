@@ -77,7 +77,15 @@ def mask_for_site(site: Site, *, use_site01_5m: bool = False) -> HorizonMask:
     ) else None
     sched = mask_schedule_for_site(site, site5)
     if sched is None:
-        raise FileNotFoundError("No DEM tiles available for mask computation")
+        # No DEMs on this machine (the normal client case): snap to the 1 km cap cell. # per D-8c03
+        from lunar_eval.horizon.cap_index import nearest_cap_mask
+
+        snapped = nearest_cap_mask(site)
+        if snapped is not None:
+            return snapped
+        raise FileNotFoundError(
+            "No DEM tiles available and the site is outside the precomputed 1 km cap"
+        )
     horizon = mask(site, schedule=sched)
     save_mask(site, horizon)
     return horizon

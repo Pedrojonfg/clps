@@ -37,3 +37,4 @@ desktop/node_modules/
 desktop/dist/
 desktop/src-tauri/target/
 desktop/public/demo/
+data/store-manifest.json

@@ -35,7 +35,12 @@ def _furnsh(kernel_dir: Path) -> None:
         return
     spice.kclear()
     for name in KERNEL_NAMES:
-        spice.furnsh(str(kernel_dir / name))
+        path = kernel_dir / name
+        if not path.is_file() and kernel_dir == KERNEL_DIR:
+            from lunar_eval.horizon.remote import locate
+
+            path = locate(f"kernels/{name}") or path  # per D-8c03: kernels come from the store
+        spice.furnsh(str(path))
     _FURNISHED = kernel_dir
 
 

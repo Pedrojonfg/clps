@@ -4,10 +4,14 @@ import type { MissionTemplate, PlannerForm, RegionSearchSummary, SitePayload } f
 export const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "1";
 const BASE = import.meta.env.BASE_URL;
 /**
- * Origin of the hosted evaluator API (build-time `VITE_API_BASE`, e.g. https://api.pedrojon.com).
- * Empty = same origin, i.e. the Vite dev proxy to a local API.
+ * Origin of the evaluator API: the engine the desktop app bundles (set at startup), or a build-time
+ * `VITE_API_BASE`. Empty = same origin, i.e. the Vite dev proxy to a local API.
  */
-export const API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
+export let API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
+/** Set once at startup by the Tauri shell to the bundled engine's loopback origin. */
+export function setApiBase(origin: string): void {
+  API_BASE = origin.replace(/\/$/, "");
+}
 export const apiUrl = (path: string) => `${API_BASE}${path}`;
 
 function toUtcIso(localValue: string): string {

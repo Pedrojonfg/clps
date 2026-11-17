@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bash ../deploy/build-desktop.sh",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -24,6 +24,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": { "engine/": "engine/" },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

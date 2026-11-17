@@ -66,10 +66,30 @@ class PolarPcpClimatology:
         default_factory=dict, repr=False
     )
 
+    def _is_default_root(self) -> bool:
+        return self.root == default_pcp_root()
+
+    def _bin_path(self, season: str, bin_1based: int) -> Path | None:
+        name = f"ltim{bin_1based:02d}.npz"
+        local = self.root / season / name
+        if local.is_file():
+            return local
+        if self._is_default_root():
+            from lunar_eval.horizon.remote import locate
+
+            return locate(f"hazards/pcp/{season}/{name}")  # per D-8c03: bins come from the store
+        return None
+
     def available(self) -> bool:
         summer = self.root / "summer"
         winter = self.root / "winter"
-        return any(p.is_dir() and any(p.glob("ltim*.npz")) for p in (summer, winter))
+        if any(p.is_dir() and any(p.glob("ltim*.npz")) for p in (summer, winter)):
+            return True
+        if self._is_default_root():
+            from lunar_eval.horizon.remote import remote_has_prefix
+
+            return remote_has_prefix("hazards/pcp/")
+        return False
 
     def preload(self, times: NDArray[np.datetime64], lon_deg: float) -> None:
         """Load unique season/LST bins for a window (threaded) before hourly lookups."""
@@ -91,11 +111,11 @@ class PolarPcpClimatology:
         key = (season, bin_1based)
         if key in self._cache:
             return self._cache[key]
-        path = self.root / season / f"ltim{bin_1based:02d}.npz"
-        if not path.is_file():
+        path = self._bin_path(season, bin_1based)
+        if path is None:
             alt = "winter" if season == "summer" else "summer"
-            path = self.root / alt / f"ltim{bin_1based:02d}.npz"
-            if not path.is_file():
+            path = self._bin_path(alt, bin_1based)
+            if path is None:
                 return None
             season = alt
             key = (season, bin_1based)

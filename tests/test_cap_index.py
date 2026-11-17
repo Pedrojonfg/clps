@@ -36,3 +36,13 @@ def test_latlon_rect_still_returns_cells() -> None:
     assert isinstance(cells, list)
     for site, *_rest in cells:
         assert SITE01.lat_deg - 0.05 <= site.lat_deg <= SITE01.lat_deg + 0.05
+
+
+def test_nearest_cap_mask_snaps_within_a_cell():
+    from lunar_eval.horizon.cap_index import nearest_cap_mask
+    from lunar_eval.providers import Site
+
+    m = nearest_cap_mask(Site(lat_deg=-89.46316, lon_deg=222.51045, observer_height_m=2.0))
+    assert m is not None and m.elevation_deg.shape == (720,)
+    # Far outside the cap: no cell, no mask.
+    assert nearest_cap_mask(Site(lat_deg=-60.0, lon_deg=0.0, observer_height_m=2.0)) is None

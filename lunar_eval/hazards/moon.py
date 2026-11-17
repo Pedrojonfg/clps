@@ -18,6 +18,12 @@ from lunar_eval.providers import Site
 DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
 PSR_MESSAGE = "This site lies in a permanently shadowed region; landing is not viable."
 
+def _data_file(rel: str) -> Path | None:
+    from lunar_eval.horizon.remote import locate
+
+    return locate(rel)
+
+
 Climatology = ClimatologyTable | RasterClimatology | PolarPcpClimatology
 
 
@@ -30,11 +36,9 @@ class MoonHazards:
 
     def __post_init__(self) -> None:
         if self.slope_path is None:
-            candidate = DATA_ROOT / "dem" / "LDSM_80S_80MPP_ADJ.TIF"
-            self.slope_path = candidate if candidate.is_file() else None
+            self.slope_path = _data_file("dem/LDSM_80S_80MPP_ADJ.TIF")
         if self.psr_path is None:
-            candidate = DATA_ROOT / "dem" / "LPSR_80S_20MPP_ADJ.TIF"
-            self.psr_path = candidate if candidate.is_file() else None
+            self.psr_path = _data_file("dem/LPSR_80S_20MPP_ADJ.TIF")
         if self.climatology is None:
             pcp = PolarPcpClimatology()
             if pcp.available():
