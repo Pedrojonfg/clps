@@ -1,0 +1,116 @@
+"""Fetch the precomputed 1 km cap from a static mask store (R2 behind a CDN).
+
+The remote is only files: ``manifest.json``, ``index.parquet`` and ``tiles/*``.
+Nothing is computed server side. Files are downloaded on demand into a local
+cache, verified against the manifest sha256, and reused afterwards (offline OK).
+# per D-20261115-pj-8c03 (remote serves masks only)
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import urllib.error
+import time
+import urllib.request
+from pathlib import Path
+
+DEFAULT_URL = "https://masks.pedrojon.com/cap_1km"
+USER_AGENT = "lunar-eval-client"
+TIMEOUT_S = 60  # per tile download
+MANIFEST_TIMEOUT_S = 8  # a missing remote must not stall the API
+RETRY_AFTER_S = 30  # after a failed probe, do not hit the network again for this long
+
+
+def remote_url() -> str | None:
+    """Base URL of the mask store; ``LUNAR_MASKS_URL=off`` disables remote fetch."""
+    url = os.environ.get("LUNAR_MASKS_URL", DEFAULT_URL).strip()
+    if not url or url.lower() == "off":
+        return None
+    return url.rstrip("/")
+
+
+def cache_dir() -> Path:
+    env = os.environ.get("LUNAR_CACHE")
+    if env:
+        return Path(env)
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(base) / "lunar-eval" / "cap_1km"
+
+
+def _get(url: str, timeout: float = TIMEOUT_S) -> urllib.request.addinfourl:
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 (https store)
+
+
+def fetch_manifest(base: str) -> dict:
+    with _get(f"{base}/manifest.json", MANIFEST_TIMEOUT_S) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def ensure_file(rel: str, dest_root: Path, base: str, manifest: dict) -> Path:
+    """Return ``dest_root/rel``, downloading and verifying it if missing or stale."""
+    entry = manifest["files"].get(rel)
+    if entry is None:
+        raise FileNotFoundError(f"{rel} is not in the remote manifest")
+    dest = dest_root / rel
+    if dest.is_file() and dest.stat().st_size == entry["size"]:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    try:
+        with _get(f"{base}/{rel}") as r, part.open("wb") as out:
+            shutil.copyfileobj(r, out, 1 << 20)
+        if _sha256(part) != entry["sha256"]:
+            raise OSError(f"checksum mismatch for {rel}")
+        part.replace(dest)
+    finally:
+        part.unlink(missing_ok=True)
+    return dest
+
+
+class RemoteCap:
+    """Lazy, cached view of the remote cap. Falls back to the cache if offline."""
+
+    def __init__(self, base: str, root: Path | None = None) -> None:
+        self.base = base
+        self.root = root or cache_dir()
+        self._manifest: dict | None = None
+        self._failed_at: float | None = None
+
+    @property
+    def manifest(self) -> dict:
+        if self._manifest is None:
+            cached = self.root / "manifest.json"
+            if self._failed_at is not None and time.monotonic() - self._failed_at < RETRY_AFTER_S:
+                raise OSError("mask store unreachable (retrying shortly)")
+            try:
+                self._manifest = fetch_manifest(self.base)
+                self.root.mkdir(parents=True, exist_ok=True)
+                cached.write_text(json.dumps(self._manifest), encoding="utf-8")
+            except (urllib.error.URLError, OSError):
+                if not cached.is_file():
+                    self._failed_at = time.monotonic()
+                    raise
+                self._manifest = json.loads(cached.read_text(encoding="utf-8"))
+        return self._manifest
+
+    def get(self, rel: str) -> Path:
+        return ensure_file(rel, self.root, self.base, self.manifest)
+
+    def available(self) -> bool:
+        try:
+            self.get("index.parquet")
+            return True
+        except (urllib.error.URLError, OSError, KeyError, FileNotFoundError):
+            return False

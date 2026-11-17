@@ -14,7 +14,25 @@ export function FirstPersonScreen({ form }: Props) {
   const [tokenOpen, setTokenOpen] = useState(() => !loadIonToken());
   const [iframeKey, setIframeKey] = useState(0);
 
-  const src = useMemo(() => firstPersonUrl(form), [form, iframeKey]);
+  // Light 2D panorama on request (slow GPU / no token). Remembered per machine.
+  const [mode2d, setMode2d] = useState(() => {
+    try {
+      return localStorage.getItem("clps:firstPerson2d") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const src = useMemo(() => firstPersonUrl(form, mode2d), [form, iframeKey, mode2d]);
+
+  function toggleMode() {
+    const next = !mode2d;
+    setMode2d(next);
+    try {
+      localStorage.setItem("clps:firstPerson2d", next ? "1" : "0");
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+  }
 
   function persistToken() {
     saveIonToken(tokenDraft);
@@ -43,6 +61,16 @@ export function FirstPersonScreen({ form }: Props) {
           onClick={() => setTokenOpen((o) => !o)}
         >
           {savedToken ? "Change token" : "Add token"}
+        </Button>
+        <Button
+          small
+          minimal
+          icon={mode2d ? "cube" : "heat-grid"}
+          intent={mode2d ? "primary" : "none"}
+          onClick={toggleMode}
+          title={mode2d ? "Load the 3D Moon backdrop (needs a GPU and a Cesium ion token)" : "Use the light 2D horizon panorama instead of the 3D view"}
+        >
+          {mode2d ? "Switch to 3D" : "Use 2D view"}
         </Button>
         <Button small minimal icon="refresh" onClick={() => setIframeKey((k) => k + 1)}>
           Reload view

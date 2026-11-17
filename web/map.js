@@ -40,6 +40,8 @@ const DEMO_ROWS = [
 ];
 
 const QUERY = new URLSearchParams(location.search);
+// Hosted API origin passed by the app (?api=https://…); empty = same origin (dev proxy / local API).
+const API_BASE = (QUERY.get("api") || "").replace(/\/$/, "");
 /** ?static=1 → browser demo without API: demo rows only, from the exported region-map JSON. */
 const STATIC = QUERY.get("static") === "1";
 const EMBEDDED = window.parent !== window;
@@ -826,7 +828,7 @@ async function postRegionMap(body) {
     if (!res.ok) throw new Error(`demo data HTTP ${res.status}`);
     return res.json();
   }
-  const res = await fetch("/region-map", {
+  const res = await fetch(API_BASE + "/region-map", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

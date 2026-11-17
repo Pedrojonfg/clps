@@ -7,11 +7,27 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="lunar-eval", version="0.2.0")
+
+# The desktop app (Tauri webview) and the Pages build call a hosted API cross-origin.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+        "https://pedrojonfg.github.io",
+        "http://localhost:1420",
+        "http://127.0.0.1:1420",
+    ],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 SCHEDULE_VERSION = "D-f369-v1"

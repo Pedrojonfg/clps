@@ -25,6 +25,8 @@
   const BAD = "#fa999c";
 
   const EMBEDDED = window.parent !== window;
+  // Hosted API origin passed by the app (?api=https://…); empty = same origin (dev proxy / local API).
+  const API_BASE = (new URLSearchParams(window.location.search).get("api") || "").replace(/\/$/, "");
   const $ = (id) => document.getElementById(id);
 
   const state = {
@@ -50,6 +52,8 @@
     if (p.has("lon")) state.lon = Number(p.get("lon"));
     const q = new URLSearchParams(p);
     q.delete("ion_token");
+    q.delete("api");
+    q.delete("mode");
     state.query = q.toString();
     return p;
   }
@@ -111,7 +115,7 @@
     try {
       // ?static=1 → browser demo without API: the exported mock payload.
       const isStatic = new URLSearchParams(state.query).get("static") === "1";
-      const res = await fetch(isStatic ? "demo/site-mock.json" : "/site?" + state.query);
+      const res = await fetch(isStatic ? "demo/site-mock.json" : API_BASE + "/site?" + state.query);
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail?.message || body.detail?.error || res.statusText);
       const live = body.data_source === "real";
@@ -977,7 +981,10 @@
     // per D-7d58 / D-ac74: no token, no ion asset or a failed start → 2D panorama
     const token = getIonToken(params);
     let ok = false;
-    if (!token) {
+    if (params.get("mode") === "2d") {
+      // The user chose the light 2D view (slow GPU, no token): never start Cesium.
+      showNotice(["2D view selected. Use “Switch to 3D” above for the Moon backdrop."]);
+    } else if (!token) {
       showNotice(["No Cesium ion token saved, so there is no 3D backdrop. Showing the 2D mask panorama."]);
     } else if (!window.Cesium) {
       showNotice(["CesiumJS could not be loaded (offline?). Showing the 2D mask panorama."]);

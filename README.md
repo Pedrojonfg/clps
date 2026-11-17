@@ -102,14 +102,20 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
   kernels and the precomputed masks. None of it is in the repo. Without that
   data the app runs in **mock mode**: the full interface and score logic work,
   but the horizon is a stand-in curve, and the app labels it as mocked.
-- **Masks are not downloadable yet.** The 1 km mask set exists, but it is not
-  published anywhere. To run deep search you have to generate it yourself
-  (overnight run).
+- **Masks come from a static store.** The 1 km mask set is published to a
+  Cloudflare R2 bucket (`masks.pedrojon.com`, ~880 MB, checksummed). Any Python
+  process without a local `data/masks/cap_1km/` downloads only the tiles it
+  needs into `~/.cache/lunar-eval/` and works offline afterwards. Set
+  `LUNAR_MASKS_URL=off` to disable it. `scripts/publish_masks.py` uploads a new
+  cap.
 - **1 km mask spacing.** The precomputed set has one mask every 1 km. Single
   sites outside it are computed on demand. Small-scale terrain between grid
   points can be missed.
-- **The desktop app needs the Python API running.** It talks to a local
-  FastAPI server, so for now it runs in development mode next to that server.
+- **The desktop app talks to a hosted API.** Builds made with
+  `deploy/build-desktop.sh` call `https://api.pedrojon.com` (override with
+  `VITE_API_BASE`), so no personal machine has to be on. The container setup
+  is in [`deploy/api/`](deploy/api/README.md). That API has no auth or rate
+  limit yet.
   There is no packaged installer yet.
 - **The 3D view needs a Cesium ion token** (free account) whose account has
   *Cesium Moon Terrain* (asset 2684829) added from the ion Asset Depot.
@@ -183,9 +189,9 @@ run `localStorage.setItem('cesium_ion_token', '<token>')` and reload.
   you don't need to start a server by hand.
 - **Finer masks over the whole cap:** move from 1 km to 100 m spacing over
   the full south polar cap.
-- **Hosted masks:** publish the precomputed masks and serve them through an
-  API. Then the app, and the browser demo, give computed results without the
-  14 GB of local data.
+- **Browser demo on the hosted API:** the masks and the API are hosted now; the
+  Pages demo still shows the mocked sample until it is pointed at the API
+  (needs a rate limit first).
 - **Run the remaining validation:** the short-night re-check and the PGDA
   illumination comparison, with results published in
   [`docs/validation.md`](docs/validation.md).
