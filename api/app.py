@@ -223,11 +223,22 @@ def site(
     start: str | None = Query(None),
     end: str | None = Query(None),
     step_h: int = Query(1, ge=1, le=24),
+    step_min: int | None = Query(None, ge=1, le=1440, description="sample step in minutes; wins over step_h"),
     template_id: str | None = Query(None),
     max_night_h: int | None = Query(None),
     max_no_earth_h: int | None = Query(None),
     min_continuous_lit_h: int = Query(0, ge=0),
+    min_total_lit_h: float = Query(0, ge=0, description="minimum total hours of light in the window; 0 = no requirement"),
     require_both: bool = Query(False),
+    battery_wh: float | None = Query(None, gt=0, description="energy mode: usable battery capacity (Wh)"),
+    array_w: float | None = Query(None, ge=0, description="energy mode: array power at normal incidence (W)"),
+    dark_w: float | None = Query(None, ge=0, description="energy mode: load in darkness (W)"),
+    endurance_h: float | None = Query(None, gt=0, description="energy mode: darkness endurance (h); dark_w = battery_wh / endurance_h"),
+    lit_w: float | None = Query(None, ge=0, description="load when lit (W); default = dark_w"),
+    panel: str | None = Query(None, description="horizontal | fixed_vertical | tracking_vertical"),
+    panel_az_deg: float | None = Query(None, ge=0, lt=360, description="fixed_vertical: geographic azimuth from north"),
+    reserve_pct: float | None = Query(None, ge=0, lt=100, description="minimum battery reserve, % of capacity (default 10)"),
+    charge_eff: float | None = Query(None, gt=0, le=1),
     sun_lit_percent: float = Query(0, ge=0, le=100),
     earth_lit_percent: float = Query(0, ge=0, le=100),
     bridge_h: int = Query(5, ge=0, le=48),
@@ -245,12 +256,6 @@ def site(
     from lunar_eval.planner_templates import DEMO_SITE01, template_needs
     from lunar_eval.providers import Site
 
-    if not kernels_available():
-        raise HTTPException(
-            status_code=503,
-            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk; use mock=1 in CI."},
-        )
-
     tpl = template_needs(template_id)
     lat_v = float(lat if lat is not None else DEMO_SITE01["lat_deg"])
     lon_v = float(lon if lon is not None else DEMO_SITE01["lon_deg"])
@@ -263,6 +268,30 @@ def site(
         "require_both": require_both,
         "min_continuous_lit_h": min_continuous_lit_h,
     }
+    if min_total_lit_h > 0:
+        needs["min_total_lit_h"] = float(min_total_lit_h)
+    energy_in = {
+        "battery_wh": battery_wh, "array_w": array_w, "dark_w": dark_w, "endurance_h": endurance_h,
+        "lit_w": lit_w, "panel": panel, "panel_az_deg": panel_az_deg, "reserve_pct": reserve_pct,
+        "charge_eff": charge_eff,
+    }
+    if any(v is not None for v in energy_in.values()):
+        if panel is not None and panel not in ("horizontal", "fixed_vertical", "tracking_vertical"):
+            raise HTTPException(status_code=422, detail="panel must be horizontal, fixed_vertical or tracking_vertical")
+        from lunar_eval.energy import params_from_needs
+
+        needs = {**needs, **{k: v for k, v in energy_in.items() if v is not None}}
+        if params_from_needs(needs) is None:
+            raise HTTPException(
+                status_code=422,
+                detail="energy mode needs battery_wh, array_w and dark_w (or endurance_h)",
+            )
+    if not kernels_available():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk; use mock=1 in CI."},
+        )
+
     # per D-20261117-pj-0c5e: explicit hazard limit > template > global default; empty = off
     for key, raw in (
         ("max_temperature_k", max_temperature_k),
@@ -287,7 +316,8 @@ def site(
 
     site_obj = Site(lat_deg=lat_v, lon_deg=lon_v, observer_height_m=2.0)
     try:
-        times = parse_time_window(start_v, end_v, step_h=step_h)
+        step_m = int(step_min) if step_min is not None else int(step_h) * 60
+        times = parse_time_window(start_v, end_v, step_min=step_m)
         return build_planner_payload(
             site_obj,
             times,
@@ -297,6 +327,7 @@ def site(
             bridge_h=bridge,
             hazards_enabled=hazards_enabled,
             local_search=local_search == 1,
+            step_min=step_m,
         )
     except FileNotFoundError as e:
         raise HTTPException(
@@ -326,6 +357,7 @@ class DeepSearchBody(BaseModel):
     hazards_enabled: bool = False
     format: str = Field(default="json", description="json | csv")
     mock: bool = Field(default=False, description="Synthetic rows for UI checks; needs no kernels or cap index")
+    step_min: int = Field(default=60, ge=1, le=60, description="sample step in minutes; 60 = coarse default, 10 = fine (D-91c6)")
 
 
 def _iso_row(row: dict | None) -> dict | None:
@@ -418,6 +450,8 @@ def deep_search_endpoint(body: DeepSearchBody):
 
     n_starts = len(span) - wh
     starts = span[:n_starts]
+    step_m = int(body.step_min)
+    fine_span = span if step_m == 60 else parse_time_window(body.start, body.end, step_min=step_m)
     sites = [c[0] for c in cells]
     site_xy = [(c[1], c[2]) for c in cells]
 
@@ -437,16 +471,17 @@ def deep_search_endpoint(body: DeepSearchBody):
         _site, _x, _y, tx, ty, row = cells[idx]
         horizon = mask_from_cap_tile(tx, ty, row)
         if idx not in sky_by_site:
-            sky_by_site[idx] = eph.sky(candidate, span)
+            sky_by_site[idx] = eph.sky(candidate, fine_span)
         t0 = np.datetime64(start, "s")
-        i0 = int((t0 - np.datetime64(span[0], "s")) / np.timedelta64(1, "h"))
-        sky_win = sky_by_site[idx][i0 : i0 + int(hours) + 1]
+        i0 = int((t0 - np.datetime64(fine_span[0], "s")) / np.timedelta64(step_m, "m"))
+        sky_win = sky_by_site[idx][i0 : i0 + int(hours) * 60 // step_m + 1]
         vis = vis_series(
             sky_win,
             horizon,
             sun_threshold=sun_thr,
             earth_threshold=earth_thr,
             bridge_h=bridge,
+            step_min=step_m,
         )
         return {"series": vis, "hazards": {}, "hazard_gap_star": False}
 

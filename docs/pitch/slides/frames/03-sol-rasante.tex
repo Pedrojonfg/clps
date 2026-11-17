@@ -1,0 +1,31 @@
+% GUION (≈30 s): «Y el polo sur es un sitio rarísimo. El Sol nunca sube: da vueltas rozando el horizonte, a menos de 3 grados. Se mueve tan despacio —4 milésimas de grado por hora— que si te equivocas una décima de grado al medir una montaña, te equivocas en un día entero de luz. Una crater rim decide si tu lander vive o muere.»
+\begin{frame}{At the south pole, the Sun never rises: it skims the horizon}
+\kicker{The problem}
+\begin{tikzpicture}[x=1cm,y=1cm]
+  % cielo / suelo
+  \fill[regolith] (0,0) -- (1.5,0.25) -- (3,0.1) -- (4.2,0.35) -- (5.2,0.2) -- (7.3,0.2) -- (8.3,1.9) -- (9.1,2.3) -- (9.8,1.6) -- (11,0.9) -- (13.6,0.8) -- (13.6,-0.6) -- (0,-0.6) -- cycle;
+  \draw[moon,line width=1pt] (0,0) -- (1.5,0.25) -- (3,0.1) -- (4.2,0.35) -- (5.2,0.2) -- (7.3,0.2) -- (8.3,1.9) -- (9.1,2.3) -- (9.8,1.6) -- (11,0.9) -- (13.6,0.8);
+  \node[label text] at (9.1,2.65) {crater rim};
+  % lander
+  \pic[scale=0.9] at (3.6,0.62) {lander};
+  % horizonte "liso" teórico
+  \draw[muted,dashed] (0,0.5) -- (13.6,0.5) node[pos=0.03,above,label text,anchor=south west] {horizon of a smooth Moon};
+  % trayectoria del Sol: casi plana
+  \draw[sun,line width=1.2pt,dash pattern=on 3pt off 3pt] (0.3,1.1) .. controls (4,1.8) and (8,1.8) .. (13.3,1.0);
+  \pic[scale=0.55] at (5.6,1.62) {sun};
+  \node[sun,font=\footnotesize\semibold] at (5.6,2.4) {the Sun: always below 3°};
+  % rayo de luz al lander
+  \draw[sun!70,line width=.8pt,-{Stealth}] (5.35,1.55) -- (4.1,0.9);
+  % sombra tras la cresta
+  \fill[space,opacity=.65] (9.8,1.6) -- (11,0.9) -- (13.6,0.8) -- (13.6,0.0) -- (9.8,0.0) -- cycle;
+  \pic[scale=0.7,visible on=<2->] at (12.0,1.25) {lander};
+  \node[visible on=<2->,bad,font=\footnotesize\semibold,align=center] at (12.0,-0.2) {in shadow: no power \faSnowflake};
+  % contador
+  \node[visible on=<3->,card,anchor=north west,text width=5.6cm] at (0.1,-0.9) {%
+     {\displayfont\fontsize{26}{26}\selectfont\color{sun}0.004°}{\small\light\ per hour}\\[1mm]
+     \small\light is how fast the Sun climbs near the pole.};
+  \node[visible on=<4->,card,anchor=north west,text width=6.2cm,draw=sun] at (6.9,-0.9) {%
+     \small\light A \hl{0.1°} error measuring a mountain\\
+     {\displayfont\fontsize{20}{22}\selectfont = \color{bad}a whole day of light!}};
+\end{tikzpicture}
+\end{frame}

@@ -44,6 +44,7 @@ const RECT_FIELDS: { key: keyof Rect; label: string }[] = [
 export function RegionMapScreen({ form, onOpenSite }: Props) {
   const [rect, setRect] = useState<Rect>(() => rectAround(form));
   const [mode, setMode] = useState<SearchMode>("optimized");
+  const [stepMin, setStepMin] = useState("60"); // bulk search defaults to coarse (D-20261117-pj-91c6)
   const [demo, setDemo] = useState(STATIC_DEMO);
   const [moon, setMoon] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -75,6 +76,7 @@ export function RegionMapScreen({ form, onOpenSite }: Props) {
           mock ? WHOLE_MOON : rect,
           mode === "optimized" || mode === "moon_optimized_mock" ? "optimized" : "total_coverage",
           mock,
+          Number(stepMin),
         ),
       );
       setDemo(false);
@@ -133,6 +135,15 @@ export function RegionMapScreen({ form, onOpenSite }: Props) {
               { value: "total_coverage", label: "Total coverage" },
               { value: "moon_optimized_mock", label: "Whole Moon · optimized (mock data)" },
               { value: "moon_total_mock", label: "Whole Moon · total coverage (mock data)" },
+            ]}
+          />
+          <HTMLSelect
+            aria-label="Time resolution"
+            value={stepMin}
+            onChange={(e) => setStepMin(e.target.value)}
+            options={[
+              { value: "60", label: "Coarse · 1 h" },
+              { value: "10", label: "Fine · 10 min" },
             ]}
           />
           <Button small intent="primary" icon="search-around" loading={busy} onClick={search}>

@@ -70,6 +70,11 @@ class MoonHazards:
             return self.climatology.at_site_time(time_utc, site.lat_deg, site.lon_deg)
         return self.climatology.at_site_time(time_utc, site.lon_deg)
 
+    def _temperature_sigma(self, site: Site, time_utc: np.datetime64) -> float | None:
+        if isinstance(self.climatology, PolarPcpClimatology):
+            return self.climatology.sigma_at_site_time(time_utc, site.lat_deg, site.lon_deg)
+        return None
+
     def hazards(self, site: Site, times: NDArray[np.datetime64]) -> dict:
         if isinstance(self.climatology, PolarPcpClimatology):
             self.climatology.preload(times, site.lon_deg)
@@ -82,6 +87,7 @@ class MoonHazards:
             hours.append(
                 {
                     "temperature_k": temp_k,
+                    "temperature_sigma_k": None,
                     "soil_resistance": resistance,
                     "slope_deg": slope_deg,
                     "psr": dict(psr),
@@ -96,6 +102,20 @@ class MoonHazards:
                 }
             )
         aggregate = aggregate_hazards(hours)
+        # The spread is costly (several PCP bins); compute it only for the hours that set the limits:
+        # the hottest hour for the maximum, the coldest for the minimum.
+        by_hour = {id(h): t for h, t in zip(hours, times, strict=True)}
+        with_t = [h for h in hours if h["temperature_k"] is not None]
+        hot = max(with_t, key=lambda h: h["temperature_k"]) if with_t else None
+        cold = min(with_t, key=lambda h: h["temperature_k"]) if with_t else None
+        if hot is not None:
+            aggregate["temperature_sigma_k"] = hot["temperature_sigma_k"] = self._temperature_sigma(
+                site, by_hour[id(hot)]
+            )
+        if cold is not None:
+            aggregate["temperature_min_sigma_k"] = cold["temperature_sigma_k"] = (
+                aggregate["temperature_sigma_k"] if cold is hot else self._temperature_sigma(site, by_hour[id(cold)])
+            )
         return {"hours": hours, "aggregate": aggregate, "psr_precheck": psr}
 
 
@@ -105,6 +125,8 @@ def aggregate_hazards(hours: list[dict]) -> dict:
     return {
         "temperature_k": max(temps) if temps else None,
         "temperature_min_k": min(temps) if temps else None,
+        "temperature_sigma_k": None,  # filled by MoonHazards.hazards for the hottest hour
+        "temperature_min_sigma_k": None,  # ... and for the coldest hour
         "soil_resistance": min(h["soil_resistance"] for h in hours) if hours else None,
         "slope_deg": hours[0]["slope_deg"] if hours else 0.0,
         "psr": hours[0]["psr"] if hours else {"in_psr": False, "message": None},

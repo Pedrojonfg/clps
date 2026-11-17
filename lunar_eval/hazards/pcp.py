@@ -55,6 +55,30 @@ class _BinCache:
     tbol: NDArray[np.float32]
 
 
+SPREAD_RADII_M = (300.0, 500.0, 1000.0)  # tried in order until >= 4 pixels are found (D-20261117-pj-3d8b)
+
+
+def spread_k(
+    cache: _BinCache,
+    xn: float,
+    yn: float,
+    *,
+    radii_m: tuple[float, ...] = SPREAD_RADII_M,
+) -> float | None:
+    """Spatial spread of the climatology around a site, in K: std of the pixels of the same local-time bin
+    within the smallest radius of `radii_m` that holds at least 4 pixels (the product omits empty bins, so
+    the 3x3 neighbourhood is often sparse). None if even the widest radius has fewer. Variability of the
+    terrain at the site, not instrument error; adjacent local-time bins are deliberately not used.
+    # per D-20261117-pj-3d8b"""
+    d2 = (cache.x - xn) ** 2 + (cache.y - yn) ** 2
+    for radius_m in radii_m:
+        r = radius_m / R_M
+        near = d2 <= r * r
+        if int(near.sum()) >= 4:
+            return float(np.std(cache.tbol[near]))
+    return None
+
+
 @dataclass
 class PolarPcpClimatology:
     """Spatial LST-bin lookup against converted PCP npz files."""
@@ -224,3 +248,15 @@ class PolarPcpClimatology:
         temp = float(value)
         self._value_cache[value_key] = (temp, dict(meta))
         return temp, meta
+
+    def sigma_at_site_time(self, time_utc: np.datetime64, lat_deg: float, lon_deg: float) -> float | None:
+        """Spatial spread (K) of the climatology at a site and time; None when the bin is not available."""
+        from lunar_eval.horizon import polar_stereo_xy
+
+        season = _south_season(time_utc)
+        bin0 = lst_bin_index(local_solar_time_h_from_utc(time_utc, lon_deg))
+        cache = self._load_bin(season, bin0 + 1)
+        if cache is None:
+            return None
+        x_m, y_m = polar_stereo_xy(lat_deg, lon_deg)
+        return spread_k(cache, x_m / R_M, y_m / R_M)

@@ -1,0 +1,22 @@
+% GUION (≈30 s): «Lo más difícil: calcular el horizonte real desde cada punto. Lanzo 720 rayos alrededor del lander y miro qué montaña tapa el cielo. Al principio usé un único mapa y la noche salía mal por 1,289 horas. Así que medí: la montaña que tapa nunca está a más de 196 km, y lo que más importa son los primeros metros. Así que uso mucho detalle cerca y menos lejos. Resultado: menos de 1 hora de error. Y el umbral de 5 horas no me lo inventé: es lo que aguantó Blue Ghost.»
+\begin{frame}{The real horizon, measured: fine detail near, coarse far}
+\kicker{The work behind it · 1}
+\begin{tikzpicture}[x=1cm,y=1cm]
+  % rayo con bandas de resolución (escala log visual)
+  \foreach \a/\b/\c/\t/\r in {0/1.4/sun/{0–1 km}/{20 m},1.4/2.6/sun!75!earth/{1–2 km}/{40 m},2.6/5.6/sun!40!earth/{2–25 km}/{80 m},5.6/12.6/earth/{25–250 km}/{240 m}}{
+    \fill[\c,opacity=.85,rounded corners=1pt] (\a,0) rectangle (\b-0.05,0.35);
+    \node[font=\scriptsize\semibold,text=\c] at ({(\a+\b)/2},0.7) {\r};
+    \node[label text,font=\scriptsize] at ({(\a+\b)/2},-0.3) {\t};
+  }
+  \pic[scale=0.8] at (-0.9,0.3) {lander};
+  \node[label text,anchor=west] at (0,1.25) {one ray (of 720) from the lander \faArrowRight\ which mountain blocks the sky?};
+  % comparativa
+  \node[visible on=<2->,card,anchor=north west,text width=3.6cm,align=center] (bad) at (0,-0.9) {%
+    \small\light One coarse map\\{\displayfont\fontsize{24}{26}\selectfont\color{bad}1,289 h}\\\scriptsize\light error in the night length};
+  \node[visible on=<3->,card,anchor=north west,text width=3.6cm,align=center] (reach) at (4.3,-0.9) {%
+    \small\light The blocking mountain\\{\displayfont\fontsize{24}{26}\selectfont\color{earth}≤ 196 km}\\\scriptsize\light measured at 56 sites};
+  \node[visible on=<4->,card,draw=good,anchor=north west,text width=3.6cm,align=center] (good) at (8.6,-0.9) {%
+    \small\light With the final scheme\\{\displayfont\fontsize{24}{26}\selectfont\color{good}≤ 1 h}\\\scriptsize\light error (28 points)};
+  \node[visible on=<4->,label text,anchor=north] at (6.3,-3.4) {\faBatteryQuarter\ \hl{5 h} tolerance: what Blue Ghost survived on battery after sunset};
+\end{tikzpicture}
+\end{frame}

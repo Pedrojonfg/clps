@@ -5,6 +5,7 @@ export type MissionTemplate = {
   max_night_h: number;
   max_no_earth_h: number;
   min_continuous_lit_h?: number;
+  min_total_lit_h?: number;
   sun_lit_percent: number;
   earth_lit_percent: number;
   bridge_h: number;
@@ -41,6 +42,11 @@ export type SitePayload = {
     hours_sun_above_threshold?: number;
     hours_earth_above_threshold?: number;
     any_both?: boolean;
+    /** Sample spacing in minutes (D-20261117-pj-91c6); the metrics above are in hours. */
+    step_min?: number;
+    /** Energy mode: state of charge per sample as a fraction of capacity, and its minimum. */
+    soc?: number[];
+    soc_min?: number;
   };
   needs: Record<string, number | boolean | undefined>;
   score: {
@@ -77,11 +83,14 @@ export type PlannerForm = {
   lon: string;
   start: string;
   end: string;
-  step_h: string;
+  /** Sample step in minutes: "10" fine, "60" coarse (D-20261117-pj-91c6). */
+  step_min: string;
   template_id: string;
   max_night_h: string;
   max_no_earth_h: string;
   min_continuous_lit_h: string;
+  /** Minimum total hours of light in the window; 0 = no requirement. */
+  min_total_lit_h: string;
   sun_lit_percent: string;
   earth_lit_percent: string;
   bridge_h: string;
@@ -89,11 +98,38 @@ export type PlannerForm = {
   max_temperature_k: string;
   min_temperature_k: string;
   min_soil_resistance: string;
+  /** Battery model (D-20261117-pj-7b2d); energy mode is on when capacity, array power and a darkness load are filled. */
+  battery_wh: string;
+  array_w: string;
+  endurance_h: string;
+  dark_w: string;
+  panel: string;
+  panel_az_deg: string;
+  lit_w: string;
+  reserve_pct: string;
+  charge_eff: string;
   require_both: boolean;
   hazards_enabled: boolean;
   local_search: boolean;
   mock: boolean;
 };
+
+export const ENERGY_DEFAULTS = {
+  battery_wh: "",
+  array_w: "",
+  endurance_h: "",
+  dark_w: "",
+  panel: "tracking_vertical",
+  panel_az_deg: "0",
+  lit_w: "",
+  reserve_pct: "10",
+  charge_eff: "",
+};
+
+/** Energy mode: tier 1 complete (capacity, array power, and a darkness load in W or as endurance in hours). */
+export function energyOn(f: Pick<PlannerForm, "battery_wh" | "array_w" | "endurance_h" | "dark_w">): boolean {
+  return Number(f.battery_wh) > 0 && f.array_w !== "" && Number(f.array_w) >= 0 && (Number(f.dark_w) > 0 || Number(f.endurance_h) > 0);
+}
 
 export const HAZARD_LIMIT_DEFAULTS = {
   max_temperature_k: "320",

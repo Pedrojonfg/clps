@@ -17,7 +17,7 @@ import {
 import { STATIC_DEMO, fetchSite, fetchTemplates } from "../api";
 import { LocalSearchBoard } from "../LocalSearchBoard";
 import { SiteResult } from "../SiteCharts";
-import { DEMO_SITE, MissionTemplate, PlannerForm, SitePayload } from "../types";
+import { DEMO_SITE, MissionTemplate, PlannerForm, SitePayload, energyOn } from "../types";
 
 type Props = {
   form: PlannerForm;
@@ -48,6 +48,7 @@ export function PlannerScreen({
   const [view, setView] = useState<"setup" | "results">(data ? "results" : "setup");
   const [tab, setTab] = useState<"overview" | "best">("overview");
   const [needsOpen, setNeedsOpen] = useState(false);
+  const [batteryOpen, setBatteryOpen] = useState(false);
 
   useEffect(() => {
     fetchTemplates()
@@ -96,6 +97,7 @@ export function PlannerScreen({
       max_night_h: String(tpl.max_night_h),
       max_no_earth_h: String(tpl.max_no_earth_h),
       min_continuous_lit_h: String(tpl.min_continuous_lit_h ?? 0),
+      min_total_lit_h: String(tpl.min_total_lit_h ?? 0),
       sun_lit_percent: String(tpl.sun_lit_percent),
       earth_lit_percent: String(tpl.earth_lit_percent),
       bridge_h: String(tpl.bridge_h),
@@ -130,7 +132,7 @@ export function PlannerScreen({
   const sc = data?.score;
   const mock = data?.data_source !== "real";
   const hasBoard = Boolean(data?.local_search?.leaderboard?.length);
-  const needsSummary = `${form.template_id ? templates.find((t) => t.id === form.template_id)?.label ?? form.template_id : "Custom"} · night ≤ ${form.max_night_h} h · no-Earth ≤ ${form.max_no_earth_h} h${form.min_continuous_lit_h !== "0" ? ` · lit ≥ ${form.min_continuous_lit_h} h` : ""}${form.require_both ? " · Sun+Earth together" : ""}${form.hazards_enabled && form.max_temperature_k ? ` · T ≤ ${form.max_temperature_k} K` : ""}${form.hazards_enabled && form.min_temperature_k ? ` · T ≥ ${form.min_temperature_k} K` : ""}`;
+  const needsSummary = `${form.template_id ? templates.find((t) => t.id === form.template_id)?.label ?? form.template_id : "Custom"} · ${energyOn(form) ? `battery ${form.battery_wh} Wh` : `night ≤ ${form.max_night_h} h`} · no-Earth ≤ ${form.max_no_earth_h} h${form.min_continuous_lit_h !== "0" ? ` · light ≥ ${form.min_continuous_lit_h} h in a row` : ""}${Number(form.min_total_lit_h) > 0 ? ` · light ≥ ${form.min_total_lit_h} h total` : ""}${form.require_both ? " · Sun+Earth together" : ""}${form.hazards_enabled && form.max_temperature_k ? ` · T ≤ ${form.max_temperature_k} K` : ""}${form.hazards_enabled && form.min_temperature_k ? ` · T ≥ ${form.min_temperature_k} K` : ""}`;
 
   /** Move the window to a leaderboard start, keeping its length; the user then re-runs. */
   function useStart(windowStartIso: string) {
@@ -302,14 +304,17 @@ export function PlannerScreen({
                 padding: "8px 0 0 8px",
               }}
             >
-              <FormGroup label="Max night (h)" style={{ margin: 0 }}>
-                <InputGroup type="number" value={form.max_night_h} onChange={(e) => setField("max_night_h", e.target.value)} />
+              <FormGroup label="Max night (h)" helperText={energyOn(form) ? "not used: battery model is on" : undefined} style={{ margin: 0 }}>
+                <InputGroup type="number" disabled={energyOn(form)} value={form.max_night_h} onChange={(e) => setField("max_night_h", e.target.value)} />
               </FormGroup>
               <FormGroup label="Max no-Earth (h)" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.max_no_earth_h} onChange={(e) => setField("max_no_earth_h", e.target.value)} />
               </FormGroup>
-              <FormGroup label="Min continuous lit (h)" style={{ margin: 0 }}>
+              <FormGroup label="Min light in a row (h)" helperText="visibility; 0 = no requirement" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.min_continuous_lit_h} onChange={(e) => setField("min_continuous_lit_h", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Min total light (h)" helperText="visibility; 0 = no requirement" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.min_total_lit_h} onChange={(e) => setField("min_total_lit_h", e.target.value)} />
               </FormGroup>
               <FormGroup label="Sun lit %" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.sun_lit_percent} onChange={(e) => setField("sun_lit_percent", e.target.value)} />
@@ -317,11 +322,14 @@ export function PlannerScreen({
               <FormGroup label="Earth lit %" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.earth_lit_percent} onChange={(e) => setField("earth_lit_percent", e.target.value)} />
               </FormGroup>
-              <FormGroup label="Shadow bridge (h)" style={{ margin: 0 }}>
-                <InputGroup type="number" value={form.bridge_h} onChange={(e) => setField("bridge_h", e.target.value)} />
+              <FormGroup label="Shadow bridge (h)" helperText={energyOn(form) ? "not used: battery model is on" : "only without battery data"} style={{ margin: 0 }}>
+                <InputGroup type="number" disabled={energyOn(form)} value={form.bridge_h} onChange={(e) => setField("bridge_h", e.target.value)} />
               </FormGroup>
-              <FormGroup label="Step (h)" style={{ margin: 0 }}>
-                <InputGroup type="number" value={form.step_h} onChange={(e) => setField("step_h", e.target.value)} />
+              <FormGroup label="Time resolution" helperText="fine sees short light intervals; coarse is faster" style={{ margin: 0 }}>
+                <HTMLSelect fill value={form.step_min || "10"} onChange={(e) => setField("step_min", e.target.value)}>
+                  <option value="10">Fine · 10 min</option>
+                  <option value="60">Coarse · 1 h</option>
+                </HTMLSelect>
               </FormGroup>
               <FormGroup label="Max temperature (K)" helperText="empty = no limit" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.max_temperature_k ?? ""} onChange={(e) => setField("max_temperature_k", e.target.value)} />
@@ -329,7 +337,7 @@ export function PlannerScreen({
               <FormGroup label="Min temperature (K)" helperText="empty = no limit" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.min_temperature_k ?? ""} onChange={(e) => setField("min_temperature_k", e.target.value)} />
               </FormGroup>
-              <FormGroup label="Min soil resistance" helperText="empty = no limit" style={{ margin: 0 }}>
+              <FormGroup label="Min soil resistance (J/m³)" helperText="empty = no limit" style={{ margin: 0 }}>
                 <InputGroup type="number" value={form.min_soil_resistance ?? ""} onChange={(e) => setField("min_soil_resistance", e.target.value)} />
               </FormGroup>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -346,6 +354,61 @@ export function PlannerScreen({
                   onChange={(e) => setField("hazards_enabled", e.currentTarget.checked)}
                 />
               </div>
+            </div>
+          </Collapse>
+        </div>
+
+        <div style={{ marginBottom: 8 }}>
+          <Button minimal small icon={batteryOpen ? "chevron-down" : "chevron-right"} onClick={() => setBatteryOpen((o) => !o)}>
+            Battery (optional)
+          </Button>
+          <span className={Classes.TEXT_MUTED} style={{ fontSize: 12 }}>
+            {energyOn(form)
+              ? "Energy balance on: the score uses the battery instead of “Max night”."
+              : "Fill capacity, array power and a darkness load to score with a battery balance."}
+          </span>
+          <Collapse isOpen={batteryOpen}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(11rem, 1fr))",
+                gap: "8px 12px",
+                padding: "8px 0 0 8px",
+              }}
+            >
+              <FormGroup label="Battery capacity (Wh)" helperText="usable" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.battery_wh} onChange={(e) => setField("battery_wh", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Array power (W)" helperText="Sun at normal incidence" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.array_w} onChange={(e) => setField("array_w", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Darkness endurance (h)" helperText="or give the load in W" style={{ margin: 0 }}>
+                <InputGroup type="number" disabled={Number(form.dark_w) > 0} value={form.endurance_h} onChange={(e) => setField("endurance_h", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Darkness load (W)" helperText="survival, incl. heaters" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.dark_w} onChange={(e) => setField("dark_w", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Panels" style={{ margin: 0 }}>
+                <HTMLSelect fill value={form.panel || "tracking_vertical"} onChange={(e) => setField("panel", e.target.value)}>
+                  <option value="tracking_vertical">Vertical, tracking the Sun</option>
+                  <option value="fixed_vertical">Vertical, fixed</option>
+                  <option value="horizontal">Horizontal</option>
+                </HTMLSelect>
+              </FormGroup>
+              {form.panel === "fixed_vertical" && (
+                <FormGroup label="Panel azimuth (°)" helperText="from north, clockwise" style={{ margin: 0 }}>
+                  <InputGroup type="number" value={form.panel_az_deg} onChange={(e) => setField("panel_az_deg", e.target.value)} />
+                </FormGroup>
+              )}
+              <FormGroup label="Load when lit (W)" helperText="empty = same as darkness" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.lit_w} onChange={(e) => setField("lit_w", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Reserve (%)" helperText="never go below" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.reserve_pct} onChange={(e) => setField("reserve_pct", e.target.value)} />
+              </FormGroup>
+              <FormGroup label="Charge efficiency (0–1)" helperText="empty = 1" style={{ margin: 0 }}>
+                <InputGroup type="number" value={form.charge_eff} onChange={(e) => setField("charge_eff", e.target.value)} />
+              </FormGroup>
             </div>
           </Collapse>
         </div>

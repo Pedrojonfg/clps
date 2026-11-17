@@ -314,8 +314,12 @@ export function VisibilityTimeline({ data, cursor, setCursor }: { data: SitePayl
     },
   ];
 
-  // Tick on round hours of the day (samples are hourly multiples of the step).
-  const tickEvery = [1, 2, 3, 6, 12, 24, 48, 72, 168].find((k) => n / k <= 9) ?? 168;
+  // Tick on round hours; samples are `step_min` apart (D-20261117-pj-91c6), so a tick every k hours is every k·60/step samples.
+  const stepH = (data.series.step_min ?? 60) / 60;
+  const spH = Math.max(1, Math.round(1 / stepH));
+  const tickHours = [1, 2, 3, 6, 12, 24, 48, 72, 168].find((k) => ((n - 1) * stepH) / k <= 9) ?? 168;
+  const tickEvery = tickHours * spH;
+  const hoursText = (samples: number) => String(Number((samples * stepH).toFixed(2)));
 
   function onMove(ev: MouseEvent<SVGSVGElement>) {
     const x = svgX(ev, TW);
@@ -332,7 +336,7 @@ export function VisibilityTimeline({ data, cursor, setCursor }: { data: SitePayl
       <figcaption style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap", marginBottom: 4 }}>
         <strong>Visibility over the window</strong>
         <span style={{ color: INK_MUTED, fontSize: 12 }}>
-          Share of each disc above the terrain, hour by hour. Marked spans are the longest gaps the score uses.
+          Share of each disc above the terrain, sample by sample. Marked spans are the longest gaps the score uses.
         </span>
       </figcaption>
       <svg
@@ -384,7 +388,7 @@ export function VisibilityTimeline({ data, cursor, setCursor }: { data: SitePayl
                     fontSize={FONT}
                     textAnchor={(gx0 + gx1) / 2 > TW - 140 ? "end" : (gx0 + gx1) / 2 < TP.l + 80 ? "start" : "middle"}
                   >
-                    {row.gapName} · {gl} h
+                    {row.gapName} · {hoursText(gl)} h
                   </text>
                 </g>
               )}
@@ -474,7 +478,9 @@ function TipRow({ color, name, frac, ok }: { color: string; name: string; frac: 
 const FAILING_LABEL: Record<string, string> = {
   night: "night is longer than allowed",
   no_earth: "the gap without Earth is longer than allowed",
+  battery: "the battery falls below the reserve",
   lit: "continuous sunlight is shorter than required",
+  lit_total: "total sunlight is less than required",
   both: "Sun and Earth are never visible together",
   temperature: "the temperature exceeds the maximum",
   temperature_min: "the temperature falls below the minimum",
@@ -491,6 +497,8 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
   const maxNight = Number(needs.max_night_h);
   const maxNoEarth = Number(needs.max_no_earth_h);
   const minLit = Number(needs.min_continuous_lit_h ?? 0);
+  const minTotalLit = Number(needs.min_total_lit_h ?? 0);
+  const energyMode = Boolean(needs.energy_mode) && s.soc_min != null;
 
   // Surface-hazard rows appear only when a limit is active and the data exists (D-20261117-pj-0c5e).
   const agg = (data.hazards as { aggregate?: Record<string, number | null> } | undefined)?.aggregate;
@@ -500,7 +508,7 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
   if (agg && needs.min_temperature_k != null && (agg.temperature_min_k ?? agg.temperature_k) != null)
     hazRows.push({ label: "Coldest temperature", actual: Math.round((agg.temperature_min_k ?? agg.temperature_k)!), limit: Number(needs.min_temperature_k), kind: "min", unit: "K", failed: failing.includes("temperature_min") });
   if (agg && needs.min_soil_resistance != null && agg.soil_resistance != null)
-    hazRows.push({ label: "Soil resistance", actual: Math.round(agg.soil_resistance), limit: Number(needs.min_soil_resistance), kind: "min", unit: "", failed: failing.includes("dust") });
+    hazRows.push({ label: "Soil resistance", actual: agg.soil_resistance, limit: Number(needs.min_soil_resistance), kind: "min", unit: "J/m³", digits: 2, failed: failing.includes("dust") });
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 260px) 1fr", gap: 24, alignItems: "start" }}>
@@ -546,9 +554,16 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
             </tr>
           </thead>
           <tbody>
-            <NeedRow label="Longest night" actual={s.longest_night_h} limit={maxNight} kind="max" failed={failing.includes("night")} />
+            {energyMode ? (
+              <NeedRow label="Lowest battery" actual={Math.round((s.soc_min ?? 1) * 100)} limit={Math.round(Number(needs.reserve_pct ?? 10))} kind="min" unit="%" failed={failing.includes("battery")} />
+            ) : (
+              <NeedRow label="Longest night" actual={s.longest_night_h} limit={maxNight} kind="max" failed={failing.includes("night")} />
+            )}
             <NeedRow label="Longest gap without Earth" actual={s.longest_no_earth_h} limit={maxNoEarth} kind="max" failed={failing.includes("no_earth")} />
             <NeedRow label="Longest continuous sunlight" actual={s.longest_lit_h ?? 0} limit={minLit} kind="min" failed={failing.includes("lit")} />
+            {minTotalLit > 0 && (
+              <NeedRow label="Total sunlight" actual={s.hours_sun_above_threshold ?? 0} limit={minTotalLit} kind="min" failed={failing.includes("lit_total")} />
+            )}
             {hazRows.map((r) => (
               <NeedRow key={r.label} {...r} />
             ))}
@@ -567,6 +582,7 @@ function NeedRow({
   kind,
   failed,
   unit = "h",
+  digits = 0,
 }: {
   label: string;
   actual: number;
@@ -574,6 +590,7 @@ function NeedRow({
   kind: "max" | "min";
   failed: boolean;
   unit?: string;
+  digits?: number;
 }) {
   const hasLimit = Number.isFinite(limit) && (unit === "h" ? limit > 0 : true);
   const ok = !failed && (!hasLimit || (kind === "max" ? actual <= limit : actual >= limit));
@@ -581,7 +598,7 @@ function NeedRow({
   return (
     <tr>
       <td>{label}</td>
-      <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{actual} {unit}</td>
+      <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{Number(actual.toFixed(digits === 0 ? 3 : digits))} {unit}</td>
       <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums", color: INK_MUTED }}>
         {hasLimit ? `${kind === "max" ? "≤" : "≥"} ${limit} ${unit}` : "none"}
       </td>
@@ -598,7 +615,7 @@ function NeedRow({
           />
           {hasLimit && (
             <span
-              title={`${kind === "max" ? "Maximum allowed" : "Minimum required"}: ${limit} h`}
+              title={`${kind === "max" ? "Maximum allowed" : "Minimum required"}: ${limit} ${unit}`}
               style={{ position: "absolute", left: `${(limit / scale) * 100}%`, top: -3, width: 2, height: 12, background: INK }}
             />
           )}

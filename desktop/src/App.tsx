@@ -25,6 +25,7 @@ import { RegionMapScreen } from "./screens/RegionMapScreen";
 import {
   AppScreen,
   DEMO_SITE,
+  ENERGY_DEFAULTS,
   HAZARD_LIMIT_DEFAULTS,
   PlannerForm,
   SavedAnalysis,
@@ -33,14 +34,16 @@ import {
 
 const initialForm: PlannerForm = {
   ...DEMO_SITE,
-  step_h: "1",
+  step_min: "10",
   template_id: "",
   max_night_h: "72",
   max_no_earth_h: "48",
   min_continuous_lit_h: "0",
+  min_total_lit_h: "0",
   sun_lit_percent: "0",
   earth_lit_percent: "0",
   bridge_h: "5",
+  ...ENERGY_DEFAULTS,
   ...HAZARD_LIMIT_DEFAULTS,
   require_both: false,
   hazards_enabled: true,

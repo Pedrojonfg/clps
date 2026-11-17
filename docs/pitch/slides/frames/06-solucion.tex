@@ -1,0 +1,25 @@
+% GUION (≈25 s): «Así que he construido un evaluador. Le das un punto, una ventana de fechas y lo que aguanta tu misión —o eliges una plantilla: Blue Ghost, VIPER, Artemis III—. Y te devuelve hora a hora qué ves, si sobrevives, una nota, y si no sobrevives, el sitio o la hora más cercanos donde sí.»
+\begin{frame}{Tell it where, when and which mission. It tells you if you survive.}
+\kicker{The solution}
+\begin{tikzpicture}[node distance=6mm]
+  \node[card,text width=3.2cm,align=left,font=\small] (in) at (0,0) {%
+    \semibold You give\\[1mm]\light
+    \textcolor{sun}{\faMapMarker*}\ a site\\
+    \textcolor{sun}{\faCalendar*}\ a time window\\
+    \textcolor{sun}{\faClipboardList}\ your mission\\[1mm]
+    {\scriptsize\color{muted} 10 templates: Blue Ghost, VIPER, Artemis III…}};
+  \node[card,draw=sun,text width=3.6cm,align=center,minimum height=3.4cm] (eng) at (4.9,0) {%
+    {\Huge\color{sun}\faCogs}\\[2mm]\semibold Engine\\[1mm]\light\scriptsize
+    real Sun \& Earth positions\\ + real lunar terrain\\ hour by hour};
+  \node[card,text width=3.4cm,align=left,font=\small] (out) at (9.9,0) {%
+    \semibold You get\\[1mm]\light
+    \textcolor{good}{\faCheckCircle}\ survive? yes/no\\
+    \textcolor{sun}{\faStar}\ a score from 0 to 1\\
+    \textcolor{earth}{\faSearch}\ the nearest\\ \hspace*{4mm}alternative\\
+    \textcolor{moon}{\faEye}\ what you see each hour};
+  \draw[flow,sun] (in) -- (eng);
+  \draw[flow,sun] (eng) -- (out);
+  \node[visible on=<2->,label text,anchor=north,text width=13cm,align=center] at (4.9,-2.4) {%
+    \faDatabase\ real NASA data: \textcolor{ink}{SPICE} (where the Sun and Earth are) · \textcolor{ink}{LOLA} (laser height map) · \textcolor{ink}{Diviner} (temperature)};
+\end{tikzpicture}
+\end{frame}

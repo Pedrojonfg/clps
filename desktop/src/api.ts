@@ -1,4 +1,4 @@
-import type { MissionTemplate, PlannerForm, RegionSearchSummary, SitePayload } from "./types";
+import { energyOn, type MissionTemplate, type PlannerForm, type RegionSearchSummary, type SitePayload } from "./types";
 
 /** Static browser demo (GitHub Pages): no API; reads JSON exported from the API's mock mode. */
 export const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "1";
@@ -25,7 +25,7 @@ export function buildSiteQuery(form: PlannerForm): string {
   p.set("lon", form.lon);
   p.set("start", toUtcIso(form.start));
   p.set("end", toUtcIso(form.end));
-  p.set("step_h", form.step_h);
+  p.set("step_min", form.step_min || "10");
   if (form.template_id) {
     p.set("template_id", form.template_id);
   } else {
@@ -36,6 +36,19 @@ export function buildSiteQuery(form: PlannerForm): string {
     p.set("sun_lit_percent", form.sun_lit_percent);
     p.set("earth_lit_percent", form.earth_lit_percent);
     p.set("bridge_h", form.bridge_h);
+  }
+  if (Number(form.min_total_lit_h) > 0) p.set("min_total_lit_h", form.min_total_lit_h);
+  // Energy mode only when tier 1 is complete; the rest are optional refinements (D-20261117-pj-7b2d).
+  if (energyOn(form)) {
+    p.set("battery_wh", form.battery_wh);
+    p.set("array_w", form.array_w);
+    if (Number(form.dark_w) > 0) p.set("dark_w", form.dark_w);
+    else p.set("endurance_h", form.endurance_h);
+    p.set("panel", form.panel || "tracking_vertical");
+    if (form.panel === "fixed_vertical") p.set("panel_az_deg", form.panel_az_deg || "0");
+    if (form.lit_w !== "") p.set("lit_w", form.lit_w);
+    if (form.reserve_pct !== "") p.set("reserve_pct", form.reserve_pct);
+    if (form.charge_eff !== "") p.set("charge_eff", form.charge_eff);
   }
   // Always explicit: an empty value switches that limit off (D-20261117-pj-0c5e).
   p.set("max_temperature_k", form.max_temperature_k ?? "320");
@@ -108,6 +121,7 @@ export async function runRegionSearch(
   rect: { lat_min: string; lat_max: string; lon_min: string; lon_max: string },
   mode: "optimized" | "total_coverage",
   mock = false,
+  stepMin = 60,
 ): Promise<RegionSearchSummary> {
   const start = toUtcIso(form.start);
   const end = toUtcIso(form.end);
@@ -130,6 +144,7 @@ export async function runRegionSearch(
       end,
       window_hours,
       template_id: form.template_id || null,
+      step_min: stepMin,
       mock,
     }),
   });

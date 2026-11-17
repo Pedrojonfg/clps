@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -28,13 +30,19 @@ def _mask_el_at_geo_az(geo_az_deg: NDArray[np.floating], elevation_deg: NDArray[
     return np.interp(mask_az, az_wrap, elev_wrap)
 
 
-def longest_night_h(fraction: NDArray[np.floating], lit_threshold: float = 0.0) -> int:
+def _as_hours(samples: int, step_h: float) -> int | float:
+    """Samples → hours; stays an int when the result is whole (hourly series, or whole hours at 10 min)."""
+    hours = round(samples * step_h, 6)
+    return int(hours) if hours == int(hours) else hours
+
+
+def longest_night_h(fraction: NDArray[np.floating], lit_threshold: float = 0.0, step_h: float = 1.0) -> int | float:
     dark = np.asarray(fraction) <= lit_threshold
     best = cur = 0
     for v in dark:
         cur = cur + 1 if v else 0
         best = max(best, cur)
-    return int(best)
+    return _as_hours(int(best), step_h)
 
 
 def _bridge(lit: NDArray[np.bool_], gap: int) -> NDArray[np.bool_]:
@@ -54,7 +62,17 @@ def _bridge(lit: NDArray[np.bool_], gap: int) -> NDArray[np.bool_]:
     return b
 
 
-def series(sky, horizon, *, sun_threshold: float = 0.0, earth_threshold: float = 0.0, bridge_h: int = 0) -> dict:
+def series(
+    sky,
+    horizon,
+    *,
+    sun_threshold: float = 0.0,
+    earth_threshold: float = 0.0,
+    bridge_h: float = 0,
+    step_min: int = 60,
+    energy=None,
+) -> dict:
+    step_h = step_min / 60.0
     sun_az = np.array([s.sun_az_deg for s in sky], dtype=np.float64)
     sun_el = np.array([s.sun_el_deg for s in sky], dtype=np.float64)
     sun_r = np.array([s.sun_radius_deg for s in sky], dtype=np.float64)
@@ -68,27 +86,43 @@ def series(sky, horizon, *, sun_threshold: float = 0.0, earth_threshold: float =
     sun_frac = sun_fraction(sun_el, mask_sun, sun_r)
     earth_frac = sun_fraction(earth_el, mask_earth, earth_r)
 
-    return {
+    out = {
         "sun_fraction": sun_frac,
         "earth_fraction": earth_frac,
-        "longest_night_h": longest_night_h(sun_frac, sun_threshold),
-        "longest_no_earth_h": longest_night_h(earth_frac, earth_threshold),
-        "longest_lit_h": longest_lit_h(sun_frac, sun_threshold, bridge_h),
-        "hours_sun_above_threshold": int(np.sum(sun_frac > sun_threshold)),
-        "hours_earth_above_threshold": int(np.sum(earth_frac > earth_threshold)),
+        "step_min": int(step_min),
+        "longest_night_h": longest_night_h(sun_frac, sun_threshold, step_h),
+        "longest_no_earth_h": longest_night_h(earth_frac, earth_threshold, step_h),
+        "longest_lit_h": longest_lit_h(sun_frac, sun_threshold, bridge_h, step_h),
+        "hours_sun_above_threshold": _as_hours(int(np.sum(sun_frac > sun_threshold)), step_h),
+        "hours_earth_above_threshold": _as_hours(int(np.sum(earth_frac > earth_threshold)), step_h),
         "any_both": bool(
             np.any((sun_frac > sun_threshold) & (earth_frac > earth_threshold))
         ),
         "schedule_version": horizon.schedule_version,
     }
+    if energy is not None:
+        from lunar_eval.energy import soc_series
+
+        soc = soc_series(
+            sun_frac, sun_az, sun_el, energy, step_h=step_h, lit_threshold=sun_threshold
+        )
+        out["soc"] = soc
+        out["soc_min"] = float(soc.min()) if len(soc) else 1.0
+    return out
 
 
-def longest_lit_h(fraction: NDArray[np.floating], lit_threshold: float = 0.0, bridge_h: int = 0) -> int:
+def longest_lit_h(
+    fraction: NDArray[np.floating],
+    lit_threshold: float = 0.0,
+    bridge_h: float = 0,
+    step_h: float = 1.0,
+) -> int | float:
     lit = np.asarray(fraction) > lit_threshold
-    if bridge_h > 0:
-        lit = _bridge(lit, bridge_h)
+    gap_samples = int(math.floor(bridge_h / step_h + 1e-9)) if bridge_h > 0 else 0
+    if gap_samples > 0:
+        lit = _bridge(lit, gap_samples)
     best = cur = 0
     for v in lit:
         cur = cur + 1 if v else 0
         best = max(best, cur)
-    return int(best)
+    return _as_hours(int(best), step_h)
