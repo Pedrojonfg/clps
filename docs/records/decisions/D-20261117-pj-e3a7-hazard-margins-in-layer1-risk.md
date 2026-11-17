@@ -51,10 +51,10 @@ spread of the pixels within 1 km of the point is ~3–12 K in summer and ~1.4–
 changes by ~2–6 K between adjacent 0.25 h bins in summer and ≤ ~2 K in winter. This is terrain and timing
 variability of the climatology, not instrument error.
 
-**Dust (`D-06cb` constants).** No spread for the proxy itself. The inputs have literature ranges, from search
-summaries that still need to be checked against the papers: bulk density ~1.30–1.35 g/cm³ in the top 25–35 cm and
-up to ~1.85 g/cm³ deeper; mean grain size 40–800 µm, mostly 60–80 µm; cohesion 0.1–1 kPa and friction angle
-30–50° for polar soil (Metzger slides). Propagating these through `ρ g D cos θ + α` gives a spread for the proxy.
+**Dust (`D-c82e` constants).** No published σ for the proxy, but its inputs have verified ranges (Metzger 2024,
+Parts 1–2): bulk density 1100–1920 kg/m³, ⟨D⟩ 1.1–2.0 · D84 (196–356 µm), cohesive energy density α 0.11–1.72 J/m³
+(analogs; k only known within a factor of 3). An illustrative propagation gives a resistance of ~0.2–2.5 J/m³,
+about one decade (σ_ln ≈ 0.6). The earlier Apollo kPa ranges (Mohr-Coulomb cohesion) do not belong in this proxy.
 
 ## Options for σ
 
