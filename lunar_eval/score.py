@@ -11,6 +11,19 @@ _SIGMA_LIT = 5.0  # per D-7520
 _SIGMA_NO_EARTH = 1.0  # per D-7520
 _BETA = 0.25  # per D-20261115-pj-48ee
 _MAX_UPLIFT = 0.40  # per D-20261115-pj-48ee
+_SIGMA_TOTAL_LIT = 5.0  # per D-20261117-pj-7b2d (provisional, same as the continuous-lit sigma)
+
+
+def _energy_mode(series: dict) -> bool:
+    """Energy mode: the series carries the lowest state of charge (D-20261117-pj-7b2d)."""
+    return series.get("soc_min") is not None
+
+
+def _reserve(needs: dict) -> float:
+    from lunar_eval.energy import RESERVE_DEFAULT
+
+    r = needs.get("energy_reserve_frac")
+    return RESERVE_DEFAULT if r is None else float(r)
 
 
 def _phi(z: float) -> float:
@@ -60,14 +73,16 @@ def _surface_layer0(hazards: dict, needs: dict) -> list[str]:
 
 def _schedule_layer0(series: dict, needs: dict) -> list[str]:
     failing: list[str] = []
-    night = float(series["longest_night_h"])
     no_earth = float(series["longest_no_earth_h"])
-    max_night = int(needs["max_night_h"])
     max_no_earth = int(needs["max_no_earth_h"])
     min_lit = int(needs.get("min_continuous_lit_h", 0))
+    min_total_lit = float(needs.get("min_total_lit_h", 0) or 0)
     longest_lit = float(series.get("longest_lit_h", 0))
     require_both = bool(needs.get("require_both", False))
-    if night > max_night:
+    if _energy_mode(series):
+        if float(series["soc_min"]) < _reserve(needs):
+            failing.append("battery")
+    elif float(series["longest_night_h"]) > int(needs["max_night_h"]):
         failing.append("night")
     if no_earth > max_no_earth:
         failing.append("no_earth")
@@ -75,31 +90,44 @@ def _schedule_layer0(series: dict, needs: dict) -> list[str]:
         failing.append("both")
     if min_lit > 0 and longest_lit < min_lit:
         failing.append("lit")
+    if min_total_lit > 0 and float(series.get("hours_sun_above_threshold", 0)) < min_total_lit:
+        failing.append("lit_total")
     return failing
 
 
 def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
     """R, B, capped R*(1+βB) — computed even when layer-0 slacks are negative. # D-5577"""
-    max_night = int(needs["max_night_h"])
     max_no_earth = int(needs["max_no_earth_h"])
     min_lit = int(needs.get("min_continuous_lit_h", 0))
-    night = float(series["longest_night_h"])
+    min_total_lit = float(needs.get("min_total_lit_h", 0) or 0)
     no_earth = float(series["longest_no_earth_h"])
     longest_lit = float(series.get("longest_lit_h", 0))
-
-    slack_night = max_night - night
     slack_no_earth = max_no_earth - no_earth
-    ps = [_phi(slack_night / _SIGMA_NIGHT), _phi(slack_no_earth / _SIGMA_NO_EARTH)]
-    terms: list[tuple[float, float]] = [
-        (0.1, _clip01(slack_night / max(max_night, 1))),
-        (0.1, _clip01(slack_no_earth / max(max_no_earth, 1))),
-    ]
+
+    if _energy_mode(series):
+        # Battery margin replaces the night term in R; surplus battery is not credited in B (D-7b2d).
+        slack_soc = float(series["soc_min"]) - _reserve(needs)
+        from lunar_eval.energy import SIGMA_SOC_DEFAULT
+
+        ps = [_phi(slack_soc / SIGMA_SOC_DEFAULT), _phi(slack_no_earth / _SIGMA_NO_EARTH)]
+        terms: list[tuple[float, float]] = [(0.1, _clip01(slack_no_earth / max(max_no_earth, 1)))]
+    else:
+        max_night = int(needs["max_night_h"])
+        slack_night = max_night - float(series["longest_night_h"])
+        ps = [_phi(slack_night / _SIGMA_NIGHT), _phi(slack_no_earth / _SIGMA_NO_EARTH)]
+        terms = [
+            (0.1, _clip01(slack_night / max(max_night, 1))),
+            (0.1, _clip01(slack_no_earth / max(max_no_earth, 1))),
+        ]
     if min_lit > 0:
         slack_lit = longest_lit - min_lit
         ps.append(_phi(slack_lit / _SIGMA_LIT))
         terms.append((0.1, _clip01(slack_lit / max(min_lit, 1))))
+    if min_total_lit > 0:
+        slack_total = float(series.get("hours_sun_above_threshold", 0)) - min_total_lit
+        ps.append(_phi(slack_total / _SIGMA_TOTAL_LIT))
+        terms.append((0.1, _clip01(slack_total / max(min_total_lit, 1))))
 
-    # Window length in hours (not samples): hours_* are in hours whatever the step (D-20261117-pj-91c6).
     if "sun_fraction" in series:
         n_div = max(len(series["sun_fraction"]) * float(series.get("step_min", 60)) / 60.0, 1.0)
     else:

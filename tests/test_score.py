@@ -514,3 +514,22 @@ def test_surface_temperature_inside_both_limits_stays_feasible() -> None:
     )
 
     assert result["feasible"] is True
+
+
+def test_min_total_lit_h_layer0_and_layer1() -> None:
+    from lunar_eval.score import score
+
+    series = {
+        "sun_fraction": [1.0] * 10 + [0.0] * 14, "earth_fraction": [1.0] * 24, "step_min": 60,
+        "longest_night_h": 4, "longest_no_earth_h": 0, "longest_lit_h": 6,
+        "hours_sun_above_threshold": 10, "hours_earth_above_threshold": 24,
+    }
+    base = {"max_night_h": 12, "max_no_earth_h": 10}
+    assert score(series, {}, base)["feasible"] is True
+    off = score(series, {}, {**base, "min_total_lit_h": 0})
+    assert off["score"] == score(series, {}, base)["score"]  # 0 = no requirement, no term
+    fail = score(series, {}, {**base, "min_total_lit_h": 12})
+    assert fail["feasible"] is False and "lit_total" in fail["breakdown"]["failing"]
+    near = score(series, {}, {**base, "min_total_lit_h": 9})
+    far = score(series, {}, {**base, "min_total_lit_h": 2})
+    assert near["feasible"] and far["feasible"] and far["score"] > near["score"]

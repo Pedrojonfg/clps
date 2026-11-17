@@ -169,3 +169,51 @@ def test_site_local_search_flag_returns_pick_and_leaderboard() -> None:
         params={"start": "2027-01-01T00:00:00Z", "end": "2027-01-01T23:00:00Z", "hazards_enabled": "false"},
     ).json()
     assert off.get("local_search") is None
+
+
+_REAL = pytest.mark.skipif(not real_data_available(), reason="Site01 DEM or kernels not present")
+_DAY = {"start": "2027-01-01T00:00:00Z", "end": "2027-01-01T23:00:00Z", "hazards_enabled": "false"}
+
+
+@_REAL
+def test_site_step_min_10_gives_six_samples_per_hour() -> None:
+    r = client.get("/site", params={**_DAY, "step_min": 10})
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert len(p["sky"]) == 23 * 6 + 1
+    assert len(p["series"]["sun_fraction"]) == len(p["sky"])
+    assert p["series"]["step_min"] == 10 and p["needs"]["step_min"] == 10
+
+
+def test_site_energy_incomplete_is_422() -> None:
+    r = client.get("/site", params={"battery_wh": 1000})
+    assert r.status_code == 422
+
+
+def test_site_energy_bad_panel_is_422() -> None:
+    r = client.get("/site", params={"battery_wh": 1000, "array_w": 300, "endurance_h": 50, "panel": "tilted"})
+    assert r.status_code == 422
+
+
+@_REAL
+def test_site_energy_mode_returns_soc_and_battery_scoring() -> None:
+    r = client.get(
+        "/site",
+        params={**_DAY, "step_min": 10, "battery_wh": 1000, "array_w": 300, "endurance_h": 50,
+                "panel": "tracking_vertical"},
+    )
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert p["needs"]["energy_mode"] is True and p["needs"]["bridge_h"] is not None
+    soc = p["series"]["soc"]
+    assert len(soc) == len(p["sky"]) and soc[0] == 1.0 and 0.0 <= min(soc) <= 1.0
+    assert p["series"]["soc_min"] == pytest.approx(min(soc))
+    assert "night" not in p["score"].get("breakdown", {}).get("failing", [])
+
+
+@_REAL
+def test_site_min_total_lit_h_fails_when_unmet() -> None:
+    r = client.get("/site", params={**_DAY, "min_total_lit_h": 1000})
+    assert r.status_code == 200, r.text
+    p = r.json()
+    assert p["score"]["feasible"] is False and "lit_total" in p["score"]["breakdown"]["failing"]

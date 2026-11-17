@@ -45,7 +45,9 @@ def _sky_row(sample: SkySample) -> dict:
 
 def _series_json(raw: dict) -> dict:
     out = dict(raw)
-    for key in ("sun_fraction", "earth_fraction"):
+    for key in ("sun_fraction", "earth_fraction", "soc"):
+        if key not in out:
+            continue
         val = out[key]
         out[key] = np.asarray(val, dtype=float).tolist()
     return out
@@ -74,13 +76,17 @@ def build_planner_payload(
 
     horizon = mask_for_site(site)
     sky_samples = SpiceEphemeris().sky(site, times)
+    from lunar_eval.energy import params_from_needs
+
+    energy = params_from_needs(needs)  # tier 1 complete => energy mode (D-20261117-pj-7b2d)
     vis = series(
         sky_samples,
         horizon,
         sun_threshold=sun_thr,
         earth_threshold=earth_thr,
-        bridge_h=int(bridge_h),
+        bridge_h=0 if energy else int(bridge_h),  # bridge_h is the no-battery-data fallback only
         step_min=int(step_min),
+        energy=energy,
     )
 
     hazard_provider = default_moon_hazards() if hazards_enabled else ConstantHazards()
@@ -88,11 +94,14 @@ def build_planner_payload(
     hazards_payload = raw_hz if hazards_enabled else {}
 
     score_needs = {
-        "max_night_h": int(needs["max_night_h"]),
+        "max_night_h": int(needs.get("max_night_h", 0)),
         "max_no_earth_h": int(needs["max_no_earth_h"]),
         "require_both": bool(needs.get("require_both", False)),
         "min_continuous_lit_h": int(needs.get("min_continuous_lit_h", 0)),
+        "min_total_lit_h": float(needs.get("min_total_lit_h", 0) or 0),
     }
+    if energy is not None:
+        score_needs["energy_reserve_frac"] = energy.reserve_frac
     if hazards_enabled and raw_hz.get("aggregate"):
         # Limits: explicit in `needs` (None = switched off), else the global default (D-20261117-pj-0c5e).
         agg = raw_hz["aggregate"]
@@ -137,6 +146,16 @@ def build_planner_payload(
             "earth_lit_threshold": earth_thr,
             "bridge_h": int(bridge_h),
             "step_min": int(step_min),
+            "energy_mode": energy is not None,
+            **(
+                {
+                    "battery_wh": energy.capacity_wh, "array_w": energy.array_w, "dark_w": energy.dark_w,
+                    "lit_w": energy.lit_w, "panel": energy.panel, "panel_az_deg": energy.panel_az_deg,
+                    "reserve_pct": energy.reserve_frac * 100.0, "charge_eff": energy.charge_eff,
+                }
+                if energy is not None
+                else {}
+            ),
             "template_id": needs.get("template_id"),
         },
     }

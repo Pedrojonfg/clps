@@ -228,7 +228,17 @@ def site(
     max_night_h: int | None = Query(None),
     max_no_earth_h: int | None = Query(None),
     min_continuous_lit_h: int = Query(0, ge=0),
+    min_total_lit_h: float = Query(0, ge=0, description="minimum total hours of light in the window; 0 = no requirement"),
     require_both: bool = Query(False),
+    battery_wh: float | None = Query(None, gt=0, description="energy mode: usable battery capacity (Wh)"),
+    array_w: float | None = Query(None, ge=0, description="energy mode: array power at normal incidence (W)"),
+    dark_w: float | None = Query(None, ge=0, description="energy mode: load in darkness (W)"),
+    endurance_h: float | None = Query(None, gt=0, description="energy mode: darkness endurance (h); dark_w = battery_wh / endurance_h"),
+    lit_w: float | None = Query(None, ge=0, description="load when lit (W); default = dark_w"),
+    panel: str | None = Query(None, description="horizontal | fixed_vertical | tracking_vertical"),
+    panel_az_deg: float | None = Query(None, ge=0, lt=360, description="fixed_vertical: geographic azimuth from north"),
+    reserve_pct: float | None = Query(None, ge=0, lt=100, description="minimum battery reserve, % of capacity (default 10)"),
+    charge_eff: float | None = Query(None, gt=0, le=1),
     sun_lit_percent: float = Query(0, ge=0, le=100),
     earth_lit_percent: float = Query(0, ge=0, le=100),
     bridge_h: int = Query(5, ge=0, le=48),
@@ -264,6 +274,24 @@ def site(
         "require_both": require_both,
         "min_continuous_lit_h": min_continuous_lit_h,
     }
+    if min_total_lit_h > 0:
+        needs["min_total_lit_h"] = float(min_total_lit_h)
+    energy_in = {
+        "battery_wh": battery_wh, "array_w": array_w, "dark_w": dark_w, "endurance_h": endurance_h,
+        "lit_w": lit_w, "panel": panel, "panel_az_deg": panel_az_deg, "reserve_pct": reserve_pct,
+        "charge_eff": charge_eff,
+    }
+    if any(v is not None for v in energy_in.values()):
+        if panel is not None and panel not in ("horizontal", "fixed_vertical", "tracking_vertical"):
+            raise HTTPException(status_code=422, detail="panel must be horizontal, fixed_vertical or tracking_vertical")
+        from lunar_eval.energy import params_from_needs
+
+        needs = {**needs, **{k: v for k, v in energy_in.items() if v is not None}}
+        if params_from_needs(needs) is None:
+            raise HTTPException(
+                status_code=422,
+                detail="energy mode needs battery_wh, array_w and dark_w (or endurance_h)",
+            )
     # per D-20261117-pj-0c5e: explicit hazard limit > template > global default; empty = off
     for key, raw in (
         ("max_temperature_k", max_temperature_k),

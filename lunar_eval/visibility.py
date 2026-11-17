@@ -70,6 +70,7 @@ def series(
     earth_threshold: float = 0.0,
     bridge_h: float = 0,
     step_min: int = 60,
+    energy=None,
 ) -> dict:
     step_h = step_min / 60.0
     sun_az = np.array([s.sun_az_deg for s in sky], dtype=np.float64)
@@ -85,7 +86,7 @@ def series(
     sun_frac = sun_fraction(sun_el, mask_sun, sun_r)
     earth_frac = sun_fraction(earth_el, mask_earth, earth_r)
 
-    return {
+    out = {
         "sun_fraction": sun_frac,
         "earth_fraction": earth_frac,
         "step_min": int(step_min),
@@ -99,6 +100,15 @@ def series(
         ),
         "schedule_version": horizon.schedule_version,
     }
+    if energy is not None:
+        from lunar_eval.energy import soc_series
+
+        soc = soc_series(
+            sun_frac, sun_az, sun_el, energy, step_h=step_h, lit_threshold=sun_threshold
+        )
+        out["soc"] = soc
+        out["soc_min"] = float(soc.min()) if len(soc) else 1.0
+    return out
 
 
 def longest_lit_h(
