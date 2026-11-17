@@ -3,14 +3,14 @@
  * needs-versus-actual. One shared time cursor links the panorama and the timeline.
  */
 import { useMemo, useRef, useState, type MouseEvent } from "react";
-import { Icon, Tag } from "@blueprintjs/core";
+import { HTMLTable, Icon, Tag } from "@blueprintjs/core";
 import {
   BAD_COLOR,
   EARTH_COLOR,
   GRID,
   INK,
   INK_MUTED,
-  OK_COLOR,
+  MONO,
   SUN_COLOR,
   TERRAIN_FILL,
   TERRAIN_LINE,
@@ -142,7 +142,7 @@ export function HorizonPanorama({ data, cursor, setCursor }: { data: SitePayload
         width="100%"
         role="img"
         aria-label="Horizon mask by azimuth with the Sun and Earth tracks over the time window"
-        style={{ display: "block", background: "#1c2127", borderRadius: 4 }}
+        style={{ display: "block", background: "#1c2127", borderRadius: 4, maxHeight: "25vh" }}
         onMouseMove={onMove}
         onMouseLeave={() => setCursor(null)}
       >
@@ -340,7 +340,7 @@ export function VisibilityTimeline({ data, cursor, setCursor }: { data: SitePayl
         width="100%"
         role="img"
         aria-label="Visible fraction of the Sun and Earth discs over the time window"
-        style={{ display: "block", background: "#1c2127", borderRadius: 4 }}
+        style={{ display: "block", background: "#1c2127", borderRadius: 4, maxHeight: "17vh" }}
         onMouseMove={onMove}
         onMouseLeave={() => setCursor(null)}
       >
@@ -476,7 +476,8 @@ const FAILING_LABEL: Record<string, string> = {
   no_earth: "the gap without Earth is longer than allowed",
   lit: "continuous sunlight is shorter than required",
   both: "Sun and Earth are never visible together",
-  temperature: "temperature limit exceeded",
+  temperature: "the temperature exceeds the maximum",
+  temperature_min: "the temperature falls below the minimum",
   dust: "soil resistance below the limit",
 };
 
@@ -486,147 +487,127 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
   const needs = data.needs ?? {};
   const failing = sc.breakdown?.failing ?? [];
   const scoreShown = sc.feasible ? sc.score : 0;
-  const ramp = "linear-gradient(90deg, rgb(255,0,0), rgb(255,255,0) 50%, rgb(0,255,0))";
 
   const maxNight = Number(needs.max_night_h);
   const maxNoEarth = Number(needs.max_no_earth_h);
   const minLit = Number(needs.min_continuous_lit_h ?? 0);
 
+  // Surface-hazard rows appear only when a limit is active and the data exists (D-20261117-pj-0c5e).
+  const agg = (data.hazards as { aggregate?: Record<string, number | null> } | undefined)?.aggregate;
+  const hazRows: React.ComponentProps<typeof NeedRow>[] = [];
+  if (agg && needs.max_temperature_k != null && agg.temperature_k != null)
+    hazRows.push({ label: "Peak temperature", actual: Math.round(agg.temperature_k), limit: Number(needs.max_temperature_k), kind: "max", unit: "K", failed: failing.includes("temperature") });
+  if (agg && needs.min_temperature_k != null && (agg.temperature_min_k ?? agg.temperature_k) != null)
+    hazRows.push({ label: "Coldest temperature", actual: Math.round((agg.temperature_min_k ?? agg.temperature_k)!), limit: Number(needs.min_temperature_k), kind: "min", unit: "K", failed: failing.includes("temperature_min") });
+  if (agg && needs.min_soil_resistance != null && agg.soil_resistance != null)
+    hazRows.push({ label: "Soil resistance", actual: Math.round(agg.soil_resistance), limit: Number(needs.min_soil_resistance), kind: "min", unit: "", failed: failing.includes("dust") });
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 280px) 1fr", gap: 24, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 260px) 1fr", gap: 24, alignItems: "start" }}>
       <section aria-label="Score">
         <div style={{ color: INK_MUTED, fontSize: 12 }}>Score for this site and window</div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "2px 0 8px" }}>
-          <span style={{ fontSize: 44, lineHeight: 1, fontWeight: 600, color: INK, fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "2px 0 4px" }}>
+          <span style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 500, color: INK, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
             {scoreShown.toFixed(2)}
           </span>
-          <Tag minimal large intent={sc.feasible ? "success" : "danger"} icon={sc.feasible ? "tick" : "cross"}>
+          <Tag minimal intent={sc.feasible ? "success" : "danger"} style={{ textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 11 }}>
             {sc.feasible ? "Feasible" : "Infeasible"}
           </Tag>
         </div>
-        <div style={{ position: "relative", height: 10, borderRadius: 2, background: ramp }} role="img"
-          aria-label={`Score ${scoreShown.toFixed(2)} on an absolute scale from 0 to ${SCORE_CEILING}`}>
-          <span
-            style={{
-              position: "absolute",
-              left: `${Math.min(100, (scoreShown / SCORE_CEILING) * 100)}%`,
-              top: -4,
-              width: 4,
-              height: 18,
-              marginLeft: -2,
-              background: INK,
-              border: "1px solid #111418",
-              borderRadius: 1,
-            }}
-          />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: INK_MUTED, marginTop: 3 }}>
-          <span>0</span>
-          <span>0.7</span>
-          <span>{SCORE_CEILING}+</span>
+        <div style={{ fontSize: 11, color: INK_MUTED }}>
+          Absolute scale 0 – {SCORE_CEILING}+ (higher is better)
         </div>
         {!sc.feasible && (
-          <p style={{ margin: "8px 0 0", fontSize: 12, color: INK_MUTED }}>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: INK_MUTED }}>
             {failing.length
               ? `Fails because ${failing.map((f) => FAILING_LABEL[f] ?? f).join("; ")}.`
               : "At least one mission need is not met."}
             {sc.companion_score != null && ` Companion score for ranking: ${sc.companion_score.toFixed(2)}.`}
           </p>
         )}
-      </section>
-
-      <section aria-label="Mission needs versus this site and window" style={{ display: "grid", gap: 10 }}>
-        <NeedBar
-          label="Longest night"
-          actual={s.longest_night_h}
-          limit={maxNight}
-          kind="max"
-          failed={failing.includes("night")}
-        />
-        <NeedBar
-          label="Longest gap without Earth"
-          actual={s.longest_no_earth_h}
-          limit={maxNoEarth}
-          kind="max"
-          failed={failing.includes("no_earth")}
-        />
-        <NeedBar
-          label="Longest continuous sunlight"
-          actual={s.longest_lit_h ?? 0}
-          limit={minLit}
-          kind="min"
-          failed={failing.includes("lit")}
-        />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12, color: INK_MUTED }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
           <Tag minimal icon={s.any_both ? "tick" : "cross"} intent={needs.require_both && !s.any_both ? "danger" : "none"}>
-            Sun and Earth together: {s.any_both ? "yes" : "never"}
+            Sun + Earth together: {s.any_both ? "yes" : "never"}
             {needs.require_both ? " (required)" : ""}
           </Tag>
-          <Tag minimal>Hazards in score: {data.hazards_enabled ? "on" : "off"}</Tag>
-          <Tag minimal>
-            Window: {data.sky.length} samples
-          </Tag>
+          <Tag minimal>Hazards: {data.hazards_enabled ? "on" : "off"}</Tag>
         </div>
+      </section>
+
+      <section aria-label="Mission needs versus this site and window">
+        <HTMLTable compact style={{ width: "100%" }}>
+          <thead>
+            <tr>
+              <th>Need</th>
+              <th style={{ textAlign: "right" }}>Actual</th>
+              <th style={{ textAlign: "right" }}>Limit</th>
+              <th style={{ width: "34%" }} aria-label="Actual against limit" />
+              <th aria-label="Status" />
+            </tr>
+          </thead>
+          <tbody>
+            <NeedRow label="Longest night" actual={s.longest_night_h} limit={maxNight} kind="max" failed={failing.includes("night")} />
+            <NeedRow label="Longest gap without Earth" actual={s.longest_no_earth_h} limit={maxNoEarth} kind="max" failed={failing.includes("no_earth")} />
+            <NeedRow label="Longest continuous sunlight" actual={s.longest_lit_h ?? 0} limit={minLit} kind="min" failed={failing.includes("lit")} />
+            {hazRows.map((r) => (
+              <NeedRow key={r.label} {...r} />
+            ))}
+          </tbody>
+        </HTMLTable>
       </section>
     </div>
   );
 }
 
-function NeedBar({
+/** One row of the needs table: neutral bar, limit tick; colour only when the need fails (D-20261117-pj-f19a). */
+function NeedRow({
   label,
   actual,
   limit,
   kind,
   failed,
+  unit = "h",
 }: {
   label: string;
   actual: number;
   limit: number;
   kind: "max" | "min";
   failed: boolean;
+  unit?: string;
 }) {
-  const hasLimit = Number.isFinite(limit) && limit > 0;
+  const hasLimit = Number.isFinite(limit) && (unit === "h" ? limit > 0 : true);
   const ok = !failed && (!hasLimit || (kind === "max" ? actual <= limit : actual >= limit));
-  // Scale so both the value and the limit fit, with the limit away from the edge.
   const scale = Math.max(actual, hasLimit ? limit : 0, 1) * 1.15;
-  const color = ok ? OK_COLOR : BAD_COLOR;
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-        <span>{label}</span>
-        <span style={{ display: "inline-flex", gap: 6, alignItems: "center", fontVariantNumeric: "tabular-nums" }}>
-          <strong>{actual} h</strong>
-          <span style={{ color: INK_MUTED }}>
-            {hasLimit ? `${kind === "max" ? "max" : "min"} ${limit} h` : kind === "min" ? "no minimum set" : "no limit set"}
-          </span>
-          <Icon icon={ok ? "tick-circle" : "error"} size={14} color={color} title={ok ? "Need met" : "Need not met"} />
-        </span>
-      </div>
-      <div style={{ position: "relative", height: 8, marginTop: 4, background: "#2f343c", borderRadius: 2 }}>
-        <div
-          style={{
-            width: `${Math.min(100, (actual / scale) * 100)}%`,
-            height: "100%",
-            background: color,
-            borderRadius: 2,
-            minWidth: actual > 0 ? 3 : 0,
-          }}
-        />
-        {hasLimit && (
-          <span
-            title={`${kind === "max" ? "Maximum allowed" : "Minimum required"}: ${limit} h`}
+    <tr>
+      <td>{label}</td>
+      <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{actual} {unit}</td>
+      <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums", color: INK_MUTED }}>
+        {hasLimit ? `${kind === "max" ? "≤" : "≥"} ${limit} ${unit}` : "none"}
+      </td>
+      <td>
+        <div style={{ position: "relative", height: 6, background: "#2f343c", borderRadius: 2 }}>
+          <div
             style={{
-              position: "absolute",
-              left: `${(limit / scale) * 100}%`,
-              top: -4,
-              width: 2,
-              height: 16,
-              background: INK,
+              width: `${Math.min(100, (actual / scale) * 100)}%`,
+              height: "100%",
+              background: ok ? "#8f99a8" : BAD_COLOR,
+              borderRadius: 2,
+              minWidth: actual > 0 ? 3 : 0,
             }}
           />
-        )}
-      </div>
-    </div>
+          {hasLimit && (
+            <span
+              title={`${kind === "max" ? "Maximum allowed" : "Minimum required"}: ${limit} h`}
+              style={{ position: "absolute", left: `${(limit / scale) * 100}%`, top: -3, width: 2, height: 12, background: INK }}
+            />
+          )}
+        </div>
+      </td>
+      <td>
+        <Icon icon={ok ? "tick" : "error"} size={14} color={ok ? INK_MUTED : BAD_COLOR} title={ok ? "Need met" : "Need not met"} />
+      </td>
+    </tr>
   );
 }
 
@@ -635,10 +616,11 @@ function NeedBar({
 export function SiteResult({ data }: { data: SitePayload }) {
   const [cursor, setCursor] = useState<number | null>(null);
   return (
-    <div style={{ display: "grid", gap: 20 }}>
+    <div style={{ display: "grid", gap: 14 }}>
       <ScoreSummary data={data} />
       <HorizonPanorama data={data} cursor={cursor} setCursor={setCursor} />
       <VisibilityTimeline data={data} cursor={cursor} setCursor={setCursor} />
     </div>
   );
 }
+

@@ -255,38 +255,12 @@
     return new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
   }
 
-  function setChip(id, ok, icon, text, frac) {
-    const chip = $(id);
-    chip.classList.toggle("ok", ok);
-    chip.classList.toggle("off", !ok);
-    chip.querySelector(".chip-icon").textContent = icon;
-    chip.querySelector(".chip-text").textContent = text;
-    chip.querySelector(".chip-bar i").style.width = `${Math.round(100 * Math.max(0, Math.min(1, frac)))}%`;
-  }
-
   function updateReadouts() {
     const n = state.now;
     if (!n) return;
     $("hour-label").textContent = fmtTimeMs(n.timeMs);
     $("sun-state").textContent = bodyText(n.sunAz, n.sunEl, n.sunFrac);
     $("earth-state").textContent = bodyText(n.earthAz, n.earthEl, n.earthFrac);
-    // per D-08e8: state in words and icon, not colour alone
-    setChip(
-      "chip-sun",
-      n.sunLit,
-      n.sunLit ? "☀" : "☾",
-      n.sunFrac >= 0.999 ? "Sunlight · full disc" : n.sunFrac <= 0.001 ? "Night · Sun hidden by terrain" : `Sunlight · ${Math.round(n.sunFrac * 100)} % of disc`,
-      n.sunFrac,
-    );
-    setChip(
-      "chip-earth",
-      n.earthLink,
-      n.earthLink ? "✓" : "✕",
-      n.earthLink
-        ? n.earthFrac >= 0.999 ? "Earth link · direct" : `Earth link · direct (${Math.round(n.earthFrac * 100)} % of disc)`
-        : "Earth link · blocked by terrain",
-      n.earthFrac,
-    );
   }
 
   /** Hour-by-hour strip under the slider: Sun-disc fraction and Earth link over the window. */
@@ -410,7 +384,6 @@
       $("details").hidden = !open;
       toggle.setAttribute("aria-expanded", String(open));
     });
-    $("hud").hidden = false;
     state.now = skyAt(state.t);
     updateReadouts();
     drawTimeStrip();

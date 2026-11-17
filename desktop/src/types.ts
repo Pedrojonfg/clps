@@ -9,6 +9,9 @@ export type MissionTemplate = {
   earth_lit_percent: number;
   bridge_h: number;
   require_both: boolean;
+  max_temperature_k?: number | null;
+  min_temperature_k?: number | null;
+  min_soil_resistance?: number | null;
 };
 
 export type SitePayload = {
@@ -82,10 +85,20 @@ export type PlannerForm = {
   sun_lit_percent: string;
   earth_lit_percent: string;
   bridge_h: string;
+  /** Hazard limits in kelvin / resistance units; empty string = no limit (D-20261117-pj-0c5e). */
+  max_temperature_k: string;
+  min_temperature_k: string;
+  min_soil_resistance: string;
   require_both: boolean;
   hazards_enabled: boolean;
   local_search: boolean;
   mock: boolean;
+};
+
+export const HAZARD_LIMIT_DEFAULTS = {
+  max_temperature_k: "320",
+  min_temperature_k: "",
+  min_soil_resistance: "0",
 };
 
 export const DEMO_SITE = {

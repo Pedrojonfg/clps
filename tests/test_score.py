@@ -481,3 +481,36 @@ def test_hazard_gap_star_set_for_missing_temperature_or_dust_only() -> None:
     assert dust_gap["hazard_gap_star"] is True
     assert not no_gap.get("hazard_gap_star")
     assert not plain.get("hazard_gap_star")
+
+
+def test_surface_temperature_below_planner_minimum_is_infeasible() -> None:
+    """D-20261117-pj-0c5e: the coldest hour of the window is checked against the minimum."""
+    result = score(
+        series={"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True},
+        hazards={"aggregate": {"temperature_k": 300.0, "temperature_min_k": 90.0, "soil_resistance": 1e6}},
+        needs={
+            "max_night_h": 50,
+            "max_no_earth_h": 20,
+            "min_temperature_k": 120.0,
+            "require_both": False,
+        },
+    )
+
+    assert result["feasible"] is False
+    assert "temperature_min" in result["breakdown"]["failing"]
+
+
+def test_surface_temperature_inside_both_limits_stays_feasible() -> None:
+    result = score(
+        series={"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True},
+        hazards={"aggregate": {"temperature_k": 300.0, "temperature_min_k": 150.0, "soil_resistance": 1e6}},
+        needs={
+            "max_night_h": 50,
+            "max_no_earth_h": 20,
+            "max_temperature_k": 320.0,
+            "min_temperature_k": 120.0,
+            "require_both": False,
+        },
+    )
+
+    assert result["feasible"] is True

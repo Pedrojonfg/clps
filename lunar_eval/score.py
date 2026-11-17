@@ -47,6 +47,12 @@ def _surface_layer0(hazards: dict, needs: dict) -> list[str]:
     res = _hazard_field(hazards, "soil_resistance")
     if max_temp is not None and temp_k is not None and temp_k > float(max_temp):
         failing.append("temperature")
+    min_temp = needs.get("min_temperature_k")
+    temp_min_k = _hazard_field(hazards, "temperature_min_k")
+    if temp_min_k is None:
+        temp_min_k = temp_k  # a single-value payload is both its own peak and its own trough
+    if min_temp is not None and temp_min_k is not None and temp_min_k < float(min_temp):
+        failing.append("temperature_min")
     if min_res is not None and res is not None and res < float(min_res):
         failing.append("dust")
     return failing

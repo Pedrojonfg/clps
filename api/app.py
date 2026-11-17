@@ -217,6 +217,9 @@ def site(
     bridge_h: int = Query(5, ge=0, le=48),
     hazards_enabled: bool = Query(True),
     local_search: int = Query(0, description="1 = include local_search block"),
+    max_temperature_k: str | None = Query(None, description="K; empty/none = no limit; absent = template/default"),
+    min_temperature_k: str | None = Query(None, description="K; empty/none = no limit; absent = template/default"),
+    min_soil_resistance: str | None = Query(None, description="empty/none = no limit; absent = template/default"),
 ) -> dict:
     # per D-20261114-pj-8588: mock only when mock=1
     if mock == 1:
@@ -244,6 +247,19 @@ def site(
         "require_both": require_both,
         "min_continuous_lit_h": min_continuous_lit_h,
     }
+    # per D-20261117-pj-0c5e: explicit hazard limit > template > global default; empty = off
+    for key, raw in (
+        ("max_temperature_k", max_temperature_k),
+        ("min_temperature_k", min_temperature_k),
+        ("min_soil_resistance", min_soil_resistance),
+    ):
+        if raw is None:
+            continue
+        txt = raw.strip().lower()
+        try:
+            needs[key] = None if txt in ("", "none") else float(txt)
+        except ValueError:
+            raise HTTPException(status_code=422, detail=f"{key} must be a number or empty") from None
     if tpl:
         sun_pct = tpl["sun_lit_percent"]
         earth_pct = tpl["earth_lit_percent"]

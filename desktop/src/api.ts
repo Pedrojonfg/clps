@@ -27,6 +27,10 @@ export function buildSiteQuery(form: PlannerForm): string {
     p.set("earth_lit_percent", form.earth_lit_percent);
     p.set("bridge_h", form.bridge_h);
   }
+  // Always explicit: an empty value switches that limit off (D-20261117-pj-0c5e).
+  p.set("max_temperature_k", form.max_temperature_k ?? "320");
+  p.set("min_temperature_k", form.min_temperature_k ?? "");
+  p.set("min_soil_resistance", form.min_soil_resistance ?? "0");
   p.set("hazards_enabled", form.hazards_enabled ? "true" : "false");
   if (form.local_search) p.set("local_search", "1");
   if (form.mock) p.set("mock", "1");

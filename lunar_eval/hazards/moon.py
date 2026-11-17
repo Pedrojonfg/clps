@@ -100,6 +100,7 @@ def aggregate_hazards(hours: list[dict]) -> dict:
     temps = [h["temperature_k"] for h in hours if h["temperature_k"] is not None]
     return {
         "temperature_k": max(temps) if temps else None,
+        "temperature_min_k": min(temps) if temps else None,
         "soil_resistance": min(h["soil_resistance"] for h in hours) if hours else None,
         "slope_deg": hours[0]["slope_deg"] if hours else 0.0,
         "psr": hours[0]["psr"] if hours else {"in_psr": False, "message": None},
