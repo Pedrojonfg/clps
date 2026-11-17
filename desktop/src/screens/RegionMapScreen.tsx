@@ -22,6 +22,13 @@ function rectAround(form: PlannerForm): Rect {
   };
 }
 
+const MODE_HELP: Record<SearchMode, string> = {
+  optimized: "Optimized: hill-climbs from several starts — fast, finds good cells, not guaranteed to be the best.",
+  total_coverage: "Total coverage: evaluates every cell — slow, and the best result is the grid optimum.",
+  moon_optimized_mock: "Whole Moon, optimized: precomputed mock data to check the UI.",
+  moon_total_mock: "Whole Moon, total coverage: precomputed mock data to check the UI.",
+};
+
 type SearchMode = "optimized" | "total_coverage" | "moon_optimized_mock" | "moon_total_mock";
 
 /** Whole supported region (the 1 km cap index stops at 80°S); the mock modes ignore the rectangle. */
@@ -168,7 +175,8 @@ export function RegionMapScreen({ form, onOpenSite }: Props) {
           <span>Demo samples — five hand-placed rows, not a search result.</span>
         ) : (
           <span>
-            Scores each 1 km cell in the rectangle for the active time window, then paints what was evaluated.
+            Deep search: scores each 1 km cell in the rectangle for the active time window and paints what was
+            evaluated. {MODE_HELP[mode]}
           </span>
         )}
       </div>

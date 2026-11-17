@@ -5,6 +5,8 @@ export const EARTH_COLOR = "#6aa5d8";
 export const TERRAIN_FILL = "#3a3f47";
 export const TERRAIN_LINE = "#c4b8a8";
 export const INK = "#f6f7f9";
+/** Blueprint's monospace stack, used for numeric readouts (D-20261117-pj-6d1e). */
+export const MONO = '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace';
 export const INK_MUTED = "#abb3bf";
 export const GRID = "#383e47";
 export const OK_COLOR = "#72ca9b";

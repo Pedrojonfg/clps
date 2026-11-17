@@ -4,7 +4,7 @@
  */
 import { useMemo, useState } from "react";
 import { Button, Checkbox, Classes, HTMLTable, Icon, Tag } from "@blueprintjs/core";
-import { GRID, INK, INK_MUTED, fmtUtc } from "./lib/sky";
+import { GRID, INK, INK_MUTED, MONO, fmtUtc } from "./lib/sky";
 import type { SitePayload } from "./types";
 
 const SCORE_CEILING = 1.4;
@@ -210,12 +210,12 @@ export function LocalSearchBoard({
                   {r.feasible ? "yes" : "no"}
                 </span>
               </td>
-              <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Number(r.score).toFixed(3)}</td>
-              <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+              <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{Number(r.score).toFixed(3)}</td>
+              <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
                 {Number(r.companion_score).toFixed(3)}
               </td>
               {anyKm && (
-                <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
                   {Number(r.distance_km).toFixed(3)}
                 </td>
               )}

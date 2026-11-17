@@ -25,6 +25,7 @@ import { RegionMapScreen } from "./screens/RegionMapScreen";
 import {
   AppScreen,
   DEMO_SITE,
+  HAZARD_LIMIT_DEFAULTS,
   PlannerForm,
   SavedAnalysis,
   SitePayload,
@@ -40,6 +41,7 @@ const initialForm: PlannerForm = {
   sun_lit_percent: "0",
   earth_lit_percent: "0",
   bridge_h: "5",
+  ...HAZARD_LIMIT_DEFAULTS,
   require_both: false,
   hazards_enabled: true,
   local_search: false,
@@ -71,14 +73,14 @@ function App() {
   }
 
   function openAnalysis(a: SavedAnalysis) {
-    setForm({ ...a.form });
+    setForm({ ...HAZARD_LIMIT_DEFAULTS, ...a.form });
     setData(null);
     setPlannerBoot(true);
     setScreen("planner");
   }
 
   function open3dFromAnalysis(a: SavedAnalysis) {
-    setForm({ ...a.form });
+    setForm({ ...HAZARD_LIMIT_DEFAULTS, ...a.form });
     setData(null);
     setScreen("firstperson");
   }

@@ -61,6 +61,7 @@ def build_planner_payload(
 ) -> dict:
     from lunar_eval.ephemeris import SpiceEphemeris
     from lunar_eval.hazards import ConstantHazards, default_moon_hazards
+    from lunar_eval.planner_templates import HAZARD_LIMITS_DEFAULT
     from lunar_eval.score import score
     from lunar_eval.visibility import series
 
@@ -88,11 +89,17 @@ def build_planner_payload(
         "min_continuous_lit_h": int(needs.get("min_continuous_lit_h", 0)),
     }
     if hazards_enabled and raw_hz.get("aggregate"):
+        # Limits: explicit in `needs` (None = switched off), else the global default (D-20261117-pj-0c5e).
         agg = raw_hz["aggregate"]
-        if agg.get("temperature_k") is not None:
-            score_needs.setdefault("max_temperature_k", 320.0)
-        if agg.get("soil_resistance") is not None:
-            score_needs.setdefault("min_soil_resistance", 0.0)
+        have = {
+            "max_temperature_k": agg.get("temperature_k"),
+            "min_temperature_k": agg.get("temperature_min_k", agg.get("temperature_k")),
+            "min_soil_resistance": agg.get("soil_resistance"),
+        }
+        for key, default in HAZARD_LIMITS_DEFAULT.items():
+            limit = needs[key] if key in needs else default
+            if limit is not None and have[key] is not None:
+                score_needs[key] = float(limit)
 
     scored = score(_series_json(vis), hazards_payload, score_needs)
     if hazards_enabled:

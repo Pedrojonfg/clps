@@ -331,6 +331,7 @@ const MARKER_VERT = `
   }
 `;
 const MARKER_FRAG = `
+  const float MARKER_ALPHA = 0.85; // D-a3f1: let the relief show through
   uniform float uSize;
   varying vec3 vColor;
   varying float vKind;
@@ -352,7 +353,7 @@ const MARKER_FRAG = `
       col = mix(col, vec3(0.96, 0.97, 0.98), dot);
     }
     col = mix(col, vec3(0.07, 0.08, 0.1), ring);
-    gl_FragColor = vec4(col, edge);
+    gl_FragColor = vec4(col, edge * MARKER_ALPHA);
   }
 `;
 

@@ -7,6 +7,16 @@ from typing import Any
 # Heritage: D-f369 (Blue Ghost ~5 h battery, VIPER 50/70 h darkness, Artemis III continuous light).
 # Numbers are planning defaults, not certified mission requirements.
 
+# Surface-hazard limits every template carries (D-20261117-pj-0c5e). The values are the
+# global defaults, not sourced per-mission figures; a template may override any of them.
+# None = no limit.
+HAZARD_LIMITS_DEFAULT: dict[str, Any] = {
+    "max_temperature_k": 320.0,
+    "min_temperature_k": None,
+    "min_soil_resistance": 0.0,
+}
+HAZARD_LIMIT_KEYS = tuple(HAZARD_LIMITS_DEFAULT)
+
 TEMPLATES: dict[str, dict[str, Any]] = {
     "blue_ghost_m1": {
         "label": "Firefly Blue Ghost (CLPS M1)",
@@ -18,6 +28,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 0,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "viper_nominal": {
         "label": "VIPER hibernation (nominal)",
@@ -29,6 +40,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 0,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "viper_requirement": {
         "label": "VIPER (conservative / 70 h)",
@@ -40,6 +52,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 0,
         "bridge_h": 9,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "artemis_iii_stay": {
         "label": "Artemis III surface stay",
@@ -51,6 +64,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 50,
         "earth_lit_percent": 50,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "clps_average": {
         "label": "CLPS portfolio average",
@@ -62,6 +76,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 0,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "intuitive_moderate": {
         "label": "IM-class moderate night",
@@ -73,6 +88,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 10,
         "earth_lit_percent": 0,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "astrobotic_conservative": {
         "label": "Astrobotic-class conservative",
@@ -84,6 +100,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 0,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "dte_relay_priority": {
         "label": "Direct-to-Earth priority",
@@ -95,6 +112,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 25,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "power_survival": {
         "label": "Long polar night survival",
@@ -106,6 +124,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 0,
         "earth_lit_percent": 0,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
     "polar_scout": {
         "label": "Polar scout / survey",
@@ -117,6 +136,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "sun_lit_percent": 25,
         "earth_lit_percent": 25,
         "bridge_h": 5,
+        **HAZARD_LIMITS_DEFAULT,
     },
 }
 
@@ -128,7 +148,7 @@ def list_templates() -> list[dict]:
         {"id": tid, "label": t["label"], "description": t["description"], **{k: t[k] for k in (
             "max_night_h", "max_no_earth_h", "require_both", "min_continuous_lit_h",
             "sun_lit_percent", "earth_lit_percent", "bridge_h",
-        )}}
+        ) + HAZARD_LIMIT_KEYS}}
         for tid, t in TEMPLATES.items()
     ]
 
@@ -147,5 +167,6 @@ def template_needs(template_id: str | None) -> dict | None:
         "sun_lit_percent": float(t["sun_lit_percent"]),
         "earth_lit_percent": float(t["earth_lit_percent"]),
         "bridge_h": int(t["bridge_h"]),
+        **{k: t[k] for k in HAZARD_LIMIT_KEYS},
         "template_id": template_id,
     }
