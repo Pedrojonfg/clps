@@ -1,0 +1,179 @@
+% theme.sty — tema compartido del deck "¿Dónde aparcar en la Luna?"
+% Compilar SIEMPRE con pdflatex. Todos los frames usan solo lo definido aquí.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{theme}
+
+\RequirePackage[T1]{fontenc}
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[english]{babel}
+\RequirePackage{tikz}
+\RequirePackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\RequirePackage{fontawesome5}
+\RequirePackage{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{tcolorbox}
+\RequirePackage{siunitx}
+\sisetup{output-decimal-marker={,}, group-separator={.}, group-minimum-digits=4}
+\usetikzlibrary{calc,positioning,arrows.meta,shapes.geometric,shapes.misc,decorations.pathmorphing,
+  decorations.markings,decorations.text,shadows.blur,fadings,patterns,backgrounds,fit,intersections,math}
+\usepgfplotslibrary{fillbetween,colormaps}
+
+% ---------------------------------------------------------------- tipografía
+\RequirePackage[type1,sfdefault]{inter}
+\newcommand{\displayfont}{\fontseries{eb}\selectfont}
+\newcommand{\light}{\fontseries{l}\selectfont}
+\newcommand{\semibold}{\fontseries{sb}\selectfont}
+\newcommand{\heavy}{\fontseries{eb}\selectfont}
+
+% ---------------------------------------------------------------- paleta
+% Fondo espacio, Luna gris, Sol amarillo (cofre), Tierra azul, alertas.
+\definecolor{space}{HTML}{0A0D14}
+\definecolor{space2}{HTML}{121826}   % paneles
+\definecolor{panel}{HTML}{182033}
+\definecolor{line}{HTML}{2A3550}
+\definecolor{ink}{HTML}{F2F4F8}      % texto principal
+\definecolor{muted}{HTML}{8C96AD}    % texto secundario
+\definecolor{moon}{HTML}{BFC3CC}
+\definecolor{moondark}{HTML}{5A606D}
+\definecolor{regolith}{HTML}{3A3F4A}
+\definecolor{sun}{HTML}{FFC23D}
+\definecolor{sundeep}{HTML}{FF8A1F}
+\definecolor{earth}{HTML}{4EA8FF}
+\definecolor{earthdeep}{HTML}{1F5FBF}
+\definecolor{good}{HTML}{3DDC84}
+\definecolor{bad}{HTML}{FF5A5F}
+\definecolor{ice}{HTML}{9BE7FF}
+
+% ---------------------------------------------------------------- beamer
+\usefonttheme{professionalfonts}
+\setbeamertemplate{navigation symbols}{}
+\setbeamercolor{background canvas}{bg=space}
+\setbeamercolor{normal text}{fg=ink,bg=space}
+\setbeamercolor{structure}{fg=sun}
+\setbeamercolor{alerted text}{fg=sun}
+\setbeamercolor{frametitle}{fg=ink}
+\setbeamerfont{normal text}{size=\normalsize}
+\setbeamersize{text margin left=9mm, text margin right=9mm}
+\setbeamertemplate{itemize items}{\textcolor{sun}{\raisebox{.15ex}{\scriptsize\faCircle}}}
+\setbeamertemplate{background}{\starfield}
+
+% Título = afirmación. Pequeña "etiqueta" (kicker) opcional encima: \kicker{...} antes de \frametitle.
+\newcommand{\kickertext}{}
+\newcommand{\kicker}[1]{\renewcommand{\kickertext}{#1}}
+\setbeamertemplate{frametitle}{%
+  \vspace*{5mm}%
+  \ifx\kickertext\empty\else{\usebeamerfont{normal text}\scriptsize\semibold\color{sun}\MakeUppercase{\kickertext}}\par\vspace{1mm}\fi
+  {\displayfont\fontsize{22}{25}\selectfont\color{ink}\insertframetitle}\par
+  \ifx\insertframesubtitle\empty\else\vspace{1mm}{\light\large\color{muted}\insertframesubtitle}\par\fi
+  \gdef\kickertext{}}
+
+% Pie: número de diapositiva discreto
+\setbeamertemplate{footline}{%
+  \hfill{\fontsize{7}{7}\selectfont\color{moondark}\insertframenumber\,/\,\inserttotalframenumber}\hspace{5mm}\vspace{3mm}}
+
+% ---------------------------------------------------------------- fondo estrellado (determinista)
+\newcommand{\starfield}{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[space] (current page.south west) rectangle (current page.north east);
+    \pgfmathsetseed{4242}
+    \foreach \i in {1,...,140}{
+      \pgfmathsetmacro{\sx}{rnd*\paperwidth/1cm}
+      \pgfmathsetmacro{\sy}{rnd*\paperheight/1cm}
+      \pgfmathsetmacro{\sr}{0.15+rnd*0.6}
+      \pgfmathsetmacro{\so}{15+rnd*45}
+      \fill[white,opacity=\so/100] ($(current page.south west)+(\sx,\sy)$) circle (\sr pt);
+    }
+  \end{tikzpicture}}
+% Frame sin estrellas (para imágenes a sangre): \begin{frame}[plain]{...} + \noStars antes del frame
+\newcommand{\noStars}{\setbeamertemplate{background}{\tikz[remember picture,overlay]\fill[space](current page.south west) rectangle (current page.north east);}}
+\newcommand{\yesStars}{\setbeamertemplate{background}{\starfield}}
+
+% ---------------------------------------------------------------- overlays dentro de TikZ
+% Uso: \node[visible on=<2->] {...};   \draw[alt=<3>{red}{gray}] ...
+\tikzset{
+  invisible/.style={opacity=0,text opacity=0},
+  visible on/.style={alt={#1{}{invisible}}},
+  alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}},
+}
+
+% ---------------------------------------------------------------- estilos TikZ comunes
+\tikzset{
+  card/.style={rounded corners=3mm, fill=panel, draw=line, line width=.6pt, inner sep=3mm, text=ink},
+  pill/.style={rounded corners=2.2mm, fill=#1!20!space, draw=#1, line width=.7pt, text=#1, inner xsep=2.2mm, inner ysep=1.1mm, font=\footnotesize\semibold},
+  pill/.default=sun,
+  glow/.style={},
+  glow/.default=sun,
+  flow/.style={-{Stealth[length=3mm]}, line width=1.4pt, color=muted},
+  label text/.style={font=\footnotesize, text=muted},
+  big number/.style={font=\displayfont\fontsize{34}{34}\selectfont, text=#1},
+  big number/.default=sun,
+}
+
+% ---------------------------------------------------------------- pics (iconos)
+% \pic[scale=..] at (x,y) {sun};  {earth};  {lander};  {battery=0.6};  {moonball};  {flag}
+\tikzset{
+  sun/.pic={
+    \foreach \a in {0,30,...,330}{\draw[sun,line width=1.2pt,line cap=round] (\a:0.42) -- (\a:0.62);}
+    \shade[inner color=white, outer color=sun] (0,0) circle (0.34);
+  },
+  earth/.pic={
+    \shade[ball color=earth] (0,0) circle (0.36);
+    \begin{scope}
+      \clip (0,0) circle (0.36);
+      \fill[good!70!black,opacity=.85] (-0.2,0.05) .. controls (-0.05,0.25) and (0.12,0.2) .. (0.05,0.0) .. controls (0,-0.15) and (-0.2,-0.12) .. cycle;
+      \fill[good!70!black,opacity=.85] (0.12,-0.12) .. controls (0.25,-0.05) and (0.3,-0.25) .. (0.18,-0.3) -- cycle;
+      \fill[white,opacity=.55] (-0.36,0.22) rectangle (0.36,0.36);
+    \end{scope}
+  },
+  moonball/.pic={
+    \shade[ball color=moon!90!black] (0,0) circle (0.5);
+    \fill[moondark,opacity=.5] (0.15,0.18) circle (0.09) (-0.2,-0.1) circle (0.13) (0.18,-0.25) circle (0.06) (-0.1,0.3) circle (0.05);
+  },
+  lander/.pic={
+    % cuerpo dorado (aislante), patas, antena y panel solar
+    \draw[moon,line width=1pt] (-0.35,-0.05) -- (-0.55,-0.45) (0.35,-0.05) -- (0.55,-0.45);
+    \draw[moon,line width=1pt] (-0.62,-0.45) -- (-0.48,-0.45) (0.48,-0.45) -- (0.62,-0.45);
+    \fill[sundeep!80!sun,rounded corners=1pt] (-0.35,-0.1) rectangle (0.35,0.28);
+    \fill[sun!60!white,opacity=.5] (-0.3,0.18) rectangle (0.3,0.24);
+    \fill[earthdeep] (0.38,0.0) rectangle (0.75,0.3);
+    \draw[earth!60!white,line width=.3pt] (0.38,0.1)--(0.75,0.1) (0.38,0.2)--(0.75,0.2) (0.5,0)--(0.5,0.3) (0.63,0)--(0.63,0.3);
+    \draw[moon,line width=.8pt] (-0.15,0.28) -- (-0.15,0.48);
+    \draw[moon,line width=.8pt,fill=space2] (-0.15,0.5) ++(-0.12,0.05) arc (200:340:0.13) -- cycle;
+  },
+  battery/.pic={
+    \draw[ink,line width=.9pt,rounded corners=1pt] (-0.4,-0.2) rectangle (0.35,0.2);
+    \fill[ink] (0.37,-0.08) rectangle (0.43,0.08);
+    \pgfmathsetmacro{\lvl}{#1}
+    \pgfmathsetmacro{\w}{-0.34+0.63*\lvl}
+    \fill[\ifdim\lvl pt<0.25pt bad\else\ifdim\lvl pt<0.5pt sun\else good\fi\fi] (-0.34,-0.14) rectangle (\w,0.14);
+  },
+  flag/.pic={
+    \draw[moon,line width=.8pt] (0,0) -- (0,0.8);
+    \fill[sun] (0,0.8) -- (0.45,0.68) -- (0,0.56) -- cycle;
+  },
+}
+
+% ---------------------------------------------------------------- utilidades de texto
+\newcommand{\hl}[1]{\textcolor{sun}{\semibold #1}}
+\newcommand{\hlearth}[1]{\textcolor{earth}{\semibold #1}}
+\newcommand{\hlbad}[1]{\textcolor{bad}{\semibold #1}}
+\newcommand{\hlgood}[1]{\textcolor{good}{\semibold #1}}
+\newcommand{\soft}[1]{\textcolor{muted}{#1}}
+% Crédito de imagen abajo a la izquierda (obligatorio en frames con fotos)
+\newcommand{\credit}[1]{\begin{tikzpicture}[remember picture,overlay]
+  \node[anchor=south west,font=\fontsize{5.5}{6}\selectfont,text=muted,inner sep=2mm] at (current page.south west) {#1};
+\end{tikzpicture}}
+% Imagen a sangre como fondo, con oscurecido opcional: \bgimage{file}{opacidad-velo 0..1}
+\newcommand{\bgimage}[2]{\begin{tikzpicture}[remember picture,overlay]
+  \node[inner sep=0,anchor=center] at (current page.center) {\includegraphics[width=\paperwidth,height=\paperheight,keepaspectratio=false]{#1}};
+  \fill[space,opacity=#2] (current page.south west) rectangle (current page.north east);
+\end{tikzpicture}}
+% Imagen segura: si falta el fichero, dibuja un hueco etiquetado en vez de romper la compilación
+\newcommand{\safeimage}[2][]{\IfFileExists{#2}{\includegraphics[#1]{#2}}{\tikz\node[draw=bad,dashed,text=bad,minimum width=3cm,minimum height=2cm,font=\tiny]{falta #2};}}
+
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\graphicspath{{img/}}
+\endinput

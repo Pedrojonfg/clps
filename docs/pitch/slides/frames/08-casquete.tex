@@ -1,0 +1,19 @@
+% GUION (≈15 s): «Y como el horizonte de un sitio no cambia con la fecha, lo calculé para todo el polo sur de una vez: 290.000 horizontes, uno por kilómetro, en 4 horas y media, en una noche, en mi ordenador.»
+\begin{frame}{290,289 horizons precomputed overnight}
+\kicker{The work behind it · 2}
+\begin{tikzpicture}
+  \begin{scope}[shift={(2.6,-0.4)}]
+    \shade[inner color=moon!55!black,outer color=moondark!60!black] (0,0) circle (2.6);
+    \begin{scope}\clip (0,0) circle (2.5);
+      \foreach \i in {-12,...,12}{\foreach \j in {-12,...,12}{\fill[sun,opacity=.7] (\i*0.2,\j*0.2) circle (0.55pt);}}
+    \end{scope}
+    \fill[space,opacity=.6] (0.9,-0.6) circle (0.35) (-1.2,0.8) circle (0.5) (0.3,1.5) circle (0.25);
+    \node[font=\tiny,text=ink] at (0,0) {\faPlus};
+    \node[label text,font=\scriptsize] at (0,-2.95) {polar cap 80°–90° S · one point per km};
+  \end{scope}
+  \node[anchor=west,align=left] at (6.3,0.9) {{\displayfont\fontsize{34}{34}\selectfont\color{sun}290,289}\\[-1mm]{\small\light horizons (one per km)}};
+  \node[visible on=<2->,anchor=west,align=left] at (6.3,-0.6) {{\displayfont\fontsize{26}{26}\selectfont 4.5 h}\quad{\small\light on my PC, 6 cores}};
+  \node[visible on=<2->,anchor=west,align=left] at (6.3,-1.6) {{\displayfont\fontsize{26}{26}\selectfont 839 MB}\quad{\small\light 2.9 KB per horizon}};
+  \node[visible on=<3->,anchor=west,label text,text width=6.5cm] at (6.3,-2.7) {\faLightbulb\ A horizon depends on the \textcolor{ink}{site}, not the \textcolor{ink}{date}: compute once, reuse forever.};
+\end{tikzpicture}
+\end{frame}

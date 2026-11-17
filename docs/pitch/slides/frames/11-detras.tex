@@ -1,0 +1,14 @@
+% GUION (≈25 s): «Detrás de esto: 78 documented decisions, cada una con sus alternativas y por qué; 110 tests, con más código de tests que de motor; y 15 bloques de trabajo en unas 22 horas. Y una regla: solo digo lo que un test respalda. Por eso la app avisa de qué está calculado, qué es simulado y qué no es mío.»
+\begin{frame}{I only claim what a test or a decision backs}
+\kicker{What's behind it}
+\begin{tikzpicture}
+  \foreach \x/\n/\t/\c in {0/78/documented decisions/sun,3.6/110/tests (109 pass + 1 skipped)/good,7.2/15/work blocks in $\sim$22 h/earth,10.8/0/made-up numbers/bad}{
+    \node[anchor=north,align=center,text width=3.2cm] at (\x+1.3,0) {{\displayfont\fontsize{38}{38}\selectfont\color{\c}\n}\\[1mm]{\small\light\t}};
+  }
+  \node[visible on=<2->,anchor=north west,font=\small\semibold,text=ink] at (0,-2.4) {The app labels everything:};
+  \node[visible on=<2->,pill=good,anchor=north west] at (0,-3.0) {\faCheck\ computed};
+  \node[visible on=<2->,pill=sun,anchor=north west] at (2.4,-3.0) {\faFlask\ mocked (demo)};
+  \node[visible on=<2->,pill=earth,anchor=north west] at (5.7,-3.0) {\faCube\ 3D backdrop: not mine};
+  \node[visible on=<2->,pill=moon,anchor=north west] at (9.2,-3.0) {\faHourglassHalf\ provisional};
+\end{tikzpicture}
+\end{frame}

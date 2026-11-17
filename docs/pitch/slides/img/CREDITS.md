@@ -1,0 +1,13 @@
+# Image credits
+
+All files downscaled (long side <= 2400 px) and re-encoded as baseline JPEG, metadata stripped.
+
+| File | Title / ID | Source | Credit | Dimensions |
+|---|---|---|---|---|
+| polo-sur.jpg | "LRO WAC South Pole Mosaic" (same mosaic as JPL PIA13523 "The Lunar South Pole"), LROC WAC, polar stereographic, ~600 km across | https://commons.wikimedia.org/wiki/File:LRO_WAC_South_Pole_Mosaic.jpg (orig. http://wms.lroc.asu.edu/lroc_browse/view/SP_Mosaic, https://photojournal.jpl.nasa.gov/catalog/PIA13523) | NASA/GSFC/Arizona State University (public domain) | 2400x2400 (grayscale) |
+| earthrise.jpg | "New High-Resolution Earthrise Image" (LRO, 12 Oct 2015, over Compton crater); NASA library ID GSFC_20171208_Archive_e000496 | https://commons.wikimedia.org/wiki/File:New_High-Resolution_Earthrise_Image.jpg (orig. https://www.nasa.gov/image-feature/goddard/lro-earthrise-2015) | NASA/Goddard/Arizona State University (public domain) | 2048x2048 |
+| viper.jpg | "VIPER lunar rover" (artist's rendering of VIPER in the dark at the south pole) | https://commons.wikimedia.org/wiki/File:VIPER_lunar_rover.jpg | NASA (Ames / Daniel Rutter) (public domain) | 2400x1350 |
+| blueghost.jpg | "Blue Ghost M1 on the Moon" — Earth above the horizon with the lander's shadow, Mare Crisium, March 2025 | https://commons.wikimedia.org/wiki/File:Blue_Ghost_M1_on_the_Moon.png | NASA/Firefly Aerospace. Commons tags it public domain, but Firefly posts its mission photos as copyrighted; credit "Firefly Aerospace / NASA" | 2400x1800 |
+| luna-llena.jpg | "Full Moon" — LRO-based (LROC + LOLA) rendering; NASA library ID GSFC_20171208_Archive_e000868 | https://images.nasa.gov/details/GSFC_20171208_Archive_e000868 (file: https://images-assets.nasa.gov/image/GSFC_20171208_Archive_e000868/GSFC_20171208_Archive_e000868~orig.jpg) | NASA's Scientific Visualization Studio / Goddard (public domain) | 2400x2400 |
+| sombra.jpg | "Where is the South Pole?" (LROC post 1276) — LROC NAC oblique view, sunlit ridge between Shackleton and de Gerlache, surrounded by shadow. Cropped to 16:9 from a 3840 px Commons render of the 28536x9998 TIFF | https://commons.wikimedia.org/wiki/File:Where_is_the_South_Pole%3F_(LROC1276).tiff | NASA/GSFC/Arizona State University (public domain) | 2393x1346 (grayscale) |
+| artemis.jpg | "Artist's Concepts Depict SpaceX's Starship HLS on the Moon for NASA Artemis" — two astronauts in Axiom suits leaving the Starship HLS elevator; NASA library ID "09 24 24 First steps Axiom suits" (MSFC, 2024-11-20) | https://images.nasa.gov/details/09%2024%2024%20First%20steps%20Axiom%20suits | SpaceX (released by NASA as "courtesy SpaceX"; not a NASA-made work, so credit "SpaceX / NASA") | 2400x1200 |

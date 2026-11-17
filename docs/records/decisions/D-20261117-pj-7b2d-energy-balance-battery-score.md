@@ -63,8 +63,9 @@ cannot see it. A reliable score needs an energy balance, which needs data the us
      continuous minimum would reject.
    - Energy and visibility are therefore not treated as redundant: the first is survival risk, the second is
      visibility value. Correlation between them is expected and is only checked in the pre-search tuning pass.
-8. **First-person indicator:** small battery icon, Blueprint style, red/amber/green, next to the time label;
-   interface details are decided separately.
+8. **First-person indicator:** small battery icon, Blueprint style, next to the time label. Neutral grey normally,
+   amber within 10 points above the reserve, red below it (colour only on trouble, `D-f19a`). Interface details
+   are decided separately.
 
 ## Out of v1 (decided by pj)
 

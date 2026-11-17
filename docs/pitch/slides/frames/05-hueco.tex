@@ -1,0 +1,16 @@
+% GUION (≈25 s): «¿Y qué herramientas hay hoy? Los mapas de la NASA son buenísimos, pero dan medias de 18 años. Es como elegir la semana de tus vacaciones en la playa mirando el tiempo medio de los últimos 18 años: no te dice si llueve el martes. Otras calculan dónde está el Sol pero sobre una Luna lisa, sin montañas. Y las profesionales son para expertos. Nadie te dice: este sitio, esta semana, esta misión.»
+\begin{frame}{Today, sites are picked from 18-year averages}
+\kicker{What exists}
+\begin{tikzpicture}
+  \node[card,text width=3.7cm,minimum height=3.2cm,align=center] (a) at (0,0) {%
+     {\Large\color{muted}\faCalendar*}\\[1mm]\semibold Illumination maps\\[1mm]\light\small \hl{18.6-year} averages};
+  \node[card,text width=3.7cm,minimum height=3.2cm,align=center] (b) at (4.6,0) {%
+     {\Large\color{muted}\faGlobe}\\[1mm]\semibold Ephemerides\\[1mm]\light\small the Sun over a\\ \hl{smooth Moon}, no mountains};
+  \node[card,text width=3.7cm,minimum height=3.2cm,align=center] (c) at (9.2,0) {%
+     {\Large\color{muted}\faTools}\\[1mm]\semibold Professional suites\\[1mm]\light\small powerful, but\\ \hl{experts only}};
+  \foreach \n in {a,b,c}{\node[visible on=<3->,text=bad,font=\Large] at ($(\n.north east)+(-0.35,-0.35)$) {\faTimes};}
+  \node[visible on=<2->,anchor=north,text width=12cm,align=center] at (4.6,-2.1) {%
+     \textcolor{sun}{\faUmbrellaBeach}\ \light\itshape ``Like booking your beach week using the average weather of the last 18 years.''};
+  \node[visible on=<3->,pill=sun,font=\normalsize\semibold] at (4.6,-3.3) {Missing: \ this site \ ×\ this week \ ×\ this mission};
+\end{tikzpicture}
+\end{frame}

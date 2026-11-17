@@ -1,0 +1,18 @@
+% GUION (≈20 s): «¿Por qué todo el mundo quiere ir al polo sur de la Luna? Porque hay un tesoro: hielo de agua en cráteres donde nunca da el Sol. Agua para beber, oxygen to breathe, fuel to fly home. El problema: aparcar al lado del tesoro sin morir en el intento.»
+{\noStars
+\begin{frame}[plain]
+\bgimage{tesoro.jpg}{0.15}
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[space,opacity=.75] (current page.north west) rectangle ($(current page.north east)+(0,-2.3)$);
+  \node[anchor=north west,align=left] at ($(current page.north west)+(0.9,-0.45)$) {%
+    {\scriptsize\semibold\color{sun}WHY IS EVERYONE GOING TO THE SOUTH POLE?}\\[1mm]
+    {\displayfont\fontsize{19}{22}\selectfont There is treasure hidden in the shadows}};
+  \node[visible on=<2->,card,anchor=south east,text width=5.3cm,align=left,font=\small] at ($(current page.south east)+(-0.6,0.7)$) {%
+    \textcolor{ice}{\faTint}\ \semibold Water ice\\[1mm]
+    \light \textcolor{ice}{\faTint}\ water to drink\\
+    \textcolor{ice}{\faWind}\ oxygen to breathe\\
+    \textcolor{sun}{\faRocket}\ fuel to fly home\\[1mm]
+    \semibold\color{sun} …but you must park next to it without freezing.};
+\end{tikzpicture}
+\end{frame}}
+\yesStars

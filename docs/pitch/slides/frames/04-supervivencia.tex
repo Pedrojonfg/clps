@@ -1,0 +1,21 @@
+% GUION (≈20 s): «Un lander necesita tres cosas: Sol para cargar las baterías, ver la Tierra para hablar con casa, y no pasar más noche de la que aguanta su batería. Blue Ghost aguantó unas 5 horas tras la puesta de Sol. VIPER, 50. Cada misión es distinta.»
+\begin{frame}{A lander needs three things to survive}
+\kicker{The rules of the game}
+\centering
+\begin{tikzpicture}
+  \foreach \x/\icon/\col/\t/\d in {0/sun/sun/Sun/{charges the battery \faBolt},4.5/earth/earth/Earth in view/{to call home \faSatelliteDish},9/battery/good/Short night/{what your battery can survive \faMoon}}{
+    \node[card,minimum width=3.9cm,minimum height=3.6cm] (c\x) at (\x,0) {};
+    \node[font=\large\semibold,text=\col] at (\x,-0.55) {\t};
+    \node[label text,text width=3.5cm,align=center] at (\x,-1.15) {\d};
+  }
+  \pic[scale=1.6] at (0,0.75) {sun};
+  \pic[scale=2.0] at (4.5,0.75) {earth};
+  \pic[scale=2.0] at (9,0.75) {battery=0.3};
+  \node[visible on=<2->,anchor=north,font=\small] at (4.5,-2.3) {%
+    \begin{tabular}{l@{\quad}l}
+      \textcolor{sun}{\faRocket}\ \semibold Blue Ghost (2025) & \light survived \hl{$\sim$5 h} of night on battery\\[1mm]
+      \textcolor{sun}{\faTruckMonster}\ \semibold VIPER & \light designed to hibernate \hl{50 h} in darkness
+    \end{tabular}};
+  \node[visible on=<3->,pill=bad] at (4.5,-3.75) {Same site + different mission = different answer};
+\end{tikzpicture}
+\end{frame}

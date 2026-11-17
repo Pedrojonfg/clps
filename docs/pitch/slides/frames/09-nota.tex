@@ -1,0 +1,27 @@
+% GUION (≈30 s): «¿Cómo puntúo? Regla de oro: si tu misión no sobrevive, la nota es cero. Sin trampas, sin comparar con el mejor sitio para que algo parezca bueno. Si sobrevives, la nota mide con cuánto margen: pasar raspando da 0,5, no 1. Y el truco: aunque todo dé cero, calculo una nota escondida que dice 'por aquí estás más cerca', como una brújula, para que el buscador sepa hacia dónde ir.»
+\begin{frame}{If your mission doesn't survive, the score is zero. No tricks.}
+\kicker{The score}
+\begin{tikzpicture}
+  % puerta capa 0
+  \node[card,draw=bad,text width=3.3cm,align=center,minimum height=3cm] (g) at (0,0) {%
+    {\Large\color{bad}\faDoorClosed}\\[1mm]\semibold Meets the minimums?\\[1mm]\light\scriptsize night, Earth, light,\\ temperature, soil};
+  \node[pill=bad,anchor=north] at (0,-1.75) {No \faArrowRight\ score = 0};
+  \draw[flow,good] (g.east) -- ++(1.1,0) node[midway,above,font=\scriptsize,text=good] {yes};
+  % curva margen
+  \begin{scope}[shift={(3.4,-1.1)}]
+    \begin{axis}[width=5.6cm,height=3.9cm,axis lines=left,xmin=-3,xmax=3,ymin=0,ymax=1.05,
+      xtick={0},xticklabels={barely},ytick={0,0.5,1},yticklabel style={font=\tiny,text=muted},xticklabel style={font=\tiny,text=muted},
+      axis line style={muted},tick style={muted},xlabel={},xlabel style={text=muted},
+      ylabel={\scriptsize score},ylabel style={text=muted}]
+      \addplot[sun,line width=1.5pt,domain=-3:3,samples=60] {1/(1+exp(-1.7*x))};
+      \addplot[only marks,mark=*,mark options={fill=sun,draw=space}] coordinates {(0,0.5)};
+    \end{axis}
+  \end{scope}
+  \node[label text,text width=4.5cm,align=center] at (5.9,-1.9) {more margin \faArrowRight\ higher score\\ (margin ÷ measured error, \hl{5 h})};
+  % brújula
+  \node[visible on=<2->,card,draw=earth,text width=3.4cm,align=center,minimum height=3cm] (b) at (10.3,0) {%
+    {\Large\color{earth}\faCompass}\\[1mm]\semibold ``Inside the impossible'' score\\[1mm]\light\scriptsize even when all is 0, it shows\\ which way is better};
+\end{tikzpicture}
+\vspace{1mm}
+\centering\uncover<3->{\small\light Margin is divided by \hl{the same error} I measured on the horizon: measuring and scoring share one model.}
+\end{frame}

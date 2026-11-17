@@ -1,0 +1,11 @@
+% GUION (≈5 s): «Vale, basta de diapositivas. Vamos a aparcar en la Luna.»
+{\setbeamertemplate{footline}{}
+\begin{frame}[plain]
+\IfFileExists{img/earthrise.jpg}{\bgimage{earthrise.jpg}{0.45}}{}
+\begin{tikzpicture}[remember picture,overlay]
+  \node[align=center] at (current page.center) {%
+    {\scriptsize\semibold\color{sun}LIVE DEMO}\\[3mm]
+    {\displayfont\fontsize{40}{42}\selectfont Let's park.}\\[5mm]
+    \tikz\pic[scale=1.6]{lander};};
+\end{tikzpicture}
+\end{frame}}

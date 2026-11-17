@@ -1,0 +1,29 @@
+% GUION (≈10 s): «Hola, soy Pedro Jon. Os voy a contar cómo elegir dónde y cuándo aparcar en la Luna sin quedarte congelado ni incomunicado.»
+{\setbeamertemplate{footline}{}
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture,overlay]
+  % Luna gigante saliendo por la derecha, con terminador
+  \begin{scope}[shift={($(current page.east)+(-1.2,-0.6)$)}]
+    \shade[ball color=moon!85!black] (0,0) circle (4.2);
+    \fill[moondark,opacity=.35] (1,1.6) circle (.5) (-1.6,-.4) circle (.8) (.6,-1.9) circle (.35) (-.4,2.4) circle (.25) (-2.4,1.3) circle (.4) (1.8,-.8) circle (.6);
+    \fill[space,opacity=.78] (0,0) circle (4.2);
+    \fill[space,opacity=.0] (0,0) circle (4.2);
+    % creciente iluminado (Sol rasante desde la derecha)
+    \begin{scope}
+      \clip (0,0) circle (4.2);
+      \shade[left color=space,right color=moon!80!white,opacity=.9] (-1.2,-4.3) rectangle (4.3,4.3);
+      \fill[moondark,opacity=.35] (1,1.6) circle (.5) (1.8,-.8) circle (.6) (.6,-1.9) circle (.35);
+    \end{scope}
+  \end{scope}
+  % pin de aparcamiento "P" en el polo sur
+  \node[circle,fill=sun,text=space,font=\displayfont\Large,minimum size=9mm,glow] (P) at ($(current page.east)+(-2.0,-4.0)$) {P};
+  \draw[sun,line width=1.2pt] (P.north) -- ++(0,0.0);
+  % texto
+  \node[anchor=west,align=left,text width=10cm] at ($(current page.west)+(1.0,0.5)$) {%
+    {\semibold\footnotesize\color{sun}LUNAR SOUTH POLE\quad·\quad SITE × TIME}\\[3mm]
+    {\displayfont\fontsize{34}{38}\selectfont Where to park\\ on the Moon?}\\[4mm]
+    {\light\large\color{muted} And, above all, \textcolor{ink}{\semibold when}.}\\[10mm]
+    {\small\semibold Pedro Jon}\\[1mm]
+    {\scriptsize\color{muted} Inspired by the NASA Space Apps 2026 CLPS challenge · not affiliated with NASA}};
+\end{tikzpicture}
+\end{frame}}

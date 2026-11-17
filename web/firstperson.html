@@ -294,6 +294,30 @@
         border-radius: 1px;
       }
 
+      /* Battery readout: neutral grey; amber near the reserve, red below it (D-f19a: colour only on trouble). */
+      #battery {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #8f99a8;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      #battery svg {
+        width: 22px;
+        height: 12px;
+        display: block;
+      }
+
+      #battery.warn {
+        color: #ec9a3c;
+      }
+
+      #battery.bad {
+        color: #fa999c;
+      }
+
       #hour-label {
         color: #f6f7f9;
         font-variant-numeric: tabular-nums;
@@ -354,9 +378,17 @@
             </span>
             <div id="scrub-track">
               <input type="range" id="hour-range" min="0" max="0" value="0" step="any" aria-label="Time in the window" />
-              <canvas id="time-strip" aria-label="Hour by hour: Sun-disc fraction (top) and Earth link (bottom)"></canvas>
+              <canvas id="time-strip" aria-label="Over the window: Sun-disc fraction (top) and Earth link (bottom)"></canvas>
             </div>
             <output id="hour-label" for="hour-range">—</output>
+            <span id="battery" hidden>
+              <svg viewBox="0 0 22 12" aria-hidden="true">
+                <rect x="0.75" y="0.75" width="18" height="10.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <rect x="19.5" y="3.5" width="2" height="5" rx="0.5" fill="currentColor" />
+                <rect id="battery-fill" x="2.5" y="2.5" width="14.5" height="7" rx="0.5" fill="currentColor" />
+              </svg>
+              <span id="battery-text">—</span>
+            </span>
           </div>
           <span class="spacer"></span>
           <span id="site-meta"></span>

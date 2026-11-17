@@ -43,6 +43,7 @@
     lon: 222.51045,
     look: { heading: 0, pitch: 4, fov: 60 },
     cesium: null, // { origin, enu, sun, earth }
+    battery: null, // { kind: soc | autonomy, values, reserve }
   };
 
   function parseQuery() {
@@ -259,15 +260,63 @@
     return new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
   }
 
+  /**
+   * Battery readout (D-20261117-pj-7b2d). With the energy model the planner sends the state of charge;
+   * without it we show an autonomy estimate relative to the user's "Max night" (dark run vs that limit,
+   * refilled by any light) and say so, never a % of a real battery.
+   */
+  function buildBattery(data) {
+    const soc = data.series?.soc;
+    const needs = data.needs || {};
+    if (Array.isArray(soc) && soc.length === data.sky.length) {
+      return { kind: "soc", values: soc, reserve: Number(needs.reserve_pct ?? 10) / 100 };
+    }
+    const maxNight = Number(needs.max_night_h);
+    const sf = data.series?.sun_fraction;
+    if (!Array.isArray(sf) || !(maxNight > 0)) return null;
+    const stepH = (Number(data.series?.step_min) || 60) / 60;
+    const thr = thresholds();
+    let run = 0;
+    const values = sf.map((f) => {
+      run = f > thr.sun ? 0 : run + stepH;
+      return Math.max(0, 1 - run / maxNight);
+    });
+    return { kind: "autonomy", values, reserve: 0 };
+  }
+
+  function updateBattery(t) {
+    const b = state.battery;
+    const box = $("battery");
+    if (!b) {
+      box.hidden = true;
+      return;
+    }
+    const v = b.values;
+    const i0 = Math.max(0, Math.min(v.length - 1, Math.floor(t)));
+    const i1 = Math.min(v.length - 1, i0 + 1);
+    const frac = Math.max(0, Math.min(1, v[i0] + (v[i1] - v[i0]) * Math.max(0, Math.min(1, t - i0))));
+    const pct = Math.round(frac * 100);
+    box.hidden = false;
+    $("battery-fill").setAttribute("width", String(14.5 * frac));
+    $("battery-text").textContent = b.kind === "soc" ? `${pct} %` : `~${pct} % autonomy`;
+    box.classList.toggle("bad", frac < b.reserve || (b.kind === "autonomy" && frac <= 0));
+    box.classList.toggle("warn", !box.classList.contains("bad") && frac < b.reserve + 0.1);
+    box.title =
+      b.kind === "soc"
+        ? `Estimated battery state of charge from your capacity, array and load. Reserve ${Math.round(b.reserve * 100)} %.`
+        : "Estimated autonomy: time in darkness relative to your Max night, refilled by any light. Not a battery model — add battery data in the planner for that.";
+  }
+
   function updateReadouts() {
     const n = state.now;
     if (!n) return;
+    updateBattery(state.t);
     $("hour-label").textContent = fmtTimeMs(n.timeMs);
     $("sun-state").textContent = bodyText(n.sunAz, n.sunEl, n.sunFrac);
     $("earth-state").textContent = bodyText(n.earthAz, n.earthEl, n.earthFrac);
   }
 
-  /** Hour-by-hour strip under the slider: Sun-disc fraction and Earth link over the window. */
+  /** Strip under the slider (one cell per sample): Sun-disc fraction and Earth link over the window. */
   function drawTimeStrip() {
     const c = $("time-strip");
     const W = c.clientWidth;
@@ -388,6 +437,7 @@
       $("details").hidden = !open;
       toggle.setAttribute("aria-expanded", String(open));
     });
+    state.battery = buildBattery(data);
     state.now = skyAt(state.t);
     updateReadouts();
     drawTimeStrip();
