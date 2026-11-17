@@ -11,16 +11,19 @@ from lunar_eval.horizon.mask_store import mask_for_site
 from lunar_eval.providers import Site, SkySample
 
 
-def parse_time_window(start_iso: str, end_iso: str, *, step_h: int = 1) -> np.ndarray:
+def parse_time_window(
+    start_iso: str, end_iso: str, *, step_h: int = 1, step_min: int | None = None
+) -> np.ndarray:
+    """Inclusive sample times; `step_min` (e.g. 10) wins over `step_h`. # per D-20261117-pj-91c6"""
     start = np.datetime64(start_iso.replace("Z", "").replace(" ", "T"), "s")
     end = np.datetime64(end_iso.replace("Z", "").replace(" ", "T"), "s")
     if end < start:
         raise ValueError("end before start")
-    step = max(int(step_h), 1)
-    n = int((end - start) / np.timedelta64(step, "h")) + 1
-    if n > 744:
+    step = max(int(step_min), 1) if step_min is not None else max(int(step_h), 1) * 60
+    if (end - start) / np.timedelta64(1, "h") > 743:
         raise ValueError("window too long (max 744 hourly steps)")
-    return start + (np.arange(n) * step).astype("timedelta64[h]")
+    n = int((end - start) / np.timedelta64(step, "m")) + 1
+    return start + (np.arange(n) * step).astype("timedelta64[m]")
 
 
 def _iso_utc(t: np.datetime64) -> str:
@@ -58,6 +61,7 @@ def build_planner_payload(
     bridge_h: int,
     hazards_enabled: bool,
     local_search: bool = False,
+    step_min: int = 60,
 ) -> dict:
     from lunar_eval.ephemeris import SpiceEphemeris
     from lunar_eval.hazards import ConstantHazards, default_moon_hazards
@@ -76,6 +80,7 @@ def build_planner_payload(
         sun_threshold=sun_thr,
         earth_threshold=earth_thr,
         bridge_h=int(bridge_h),
+        step_min=int(step_min),
     )
 
     hazard_provider = default_moon_hazards() if hazards_enabled else ConstantHazards()
@@ -131,6 +136,7 @@ def build_planner_payload(
             "sun_lit_threshold": sun_thr,
             "earth_lit_threshold": earth_thr,
             "bridge_h": int(bridge_h),
+            "step_min": int(step_min),
             "template_id": needs.get("template_id"),
         },
     }
@@ -145,7 +151,7 @@ def build_planner_payload(
         def evaluate(candidate: Site, start, hours: int) -> dict:
             t0 = np.datetime64(start, "s")
             n = int(hours) + 1
-            win_times = t0 + (np.arange(n) * np.timedelta64(1, "h"))
+            win_times = t0 + (np.arange(int(hours) * 60 // int(step_min) + 1) * np.timedelta64(int(step_min), "m"))
             sub = build_planner_payload(
                 candidate,
                 win_times,
@@ -155,6 +161,7 @@ def build_planner_payload(
                 bridge_h=bridge_h,
                 hazards_enabled=hazards_enabled,
                 local_search=False,
+                step_min=step_min,
             )
             hz = sub.get("hazards") or {}
             sub_score = sub["score"]

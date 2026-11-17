@@ -60,12 +60,12 @@ def _surface_layer0(hazards: dict, needs: dict) -> list[str]:
 
 def _schedule_layer0(series: dict, needs: dict) -> list[str]:
     failing: list[str] = []
-    night = int(series["longest_night_h"])
-    no_earth = int(series["longest_no_earth_h"])
+    night = float(series["longest_night_h"])
+    no_earth = float(series["longest_no_earth_h"])
     max_night = int(needs["max_night_h"])
     max_no_earth = int(needs["max_no_earth_h"])
     min_lit = int(needs.get("min_continuous_lit_h", 0))
-    longest_lit = int(series.get("longest_lit_h", 0))
+    longest_lit = float(series.get("longest_lit_h", 0))
     require_both = bool(needs.get("require_both", False))
     if night > max_night:
         failing.append("night")
@@ -83,9 +83,9 @@ def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
     max_night = int(needs["max_night_h"])
     max_no_earth = int(needs["max_no_earth_h"])
     min_lit = int(needs.get("min_continuous_lit_h", 0))
-    night = int(series["longest_night_h"])
-    no_earth = int(series["longest_no_earth_h"])
-    longest_lit = int(series.get("longest_lit_h", 0))
+    night = float(series["longest_night_h"])
+    no_earth = float(series["longest_no_earth_h"])
+    longest_lit = float(series.get("longest_lit_h", 0))
 
     slack_night = max_night - night
     slack_no_earth = max_no_earth - no_earth
@@ -99,12 +99,13 @@ def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
         ps.append(_phi(slack_lit / _SIGMA_LIT))
         terms.append((0.1, _clip01(slack_lit / max(min_lit, 1))))
 
+    # Window length in hours (not samples): hours_* are in hours whatever the step (D-20261117-pj-91c6).
     if "sun_fraction" in series:
-        n_div = max(len(series["sun_fraction"]), 1)
+        n_div = max(len(series["sun_fraction"]) * float(series.get("step_min", 60)) / 60.0, 1.0)
     else:
-        n_div = 1
-    hours_sun = int(series.get("hours_sun_above_threshold", 0))
-    hours_earth = int(series.get("hours_earth_above_threshold", 0))
+        n_div = 1.0
+    hours_sun = float(series.get("hours_sun_above_threshold", 0))
+    hours_earth = float(series.get("hours_earth_above_threshold", 0))
     terms.append((1.0, _clip01(hours_sun / n_div)))
     terms.append((1.0, _clip01(hours_earth / n_div)))
 

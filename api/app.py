@@ -223,6 +223,7 @@ def site(
     start: str | None = Query(None),
     end: str | None = Query(None),
     step_h: int = Query(1, ge=1, le=24),
+    step_min: int | None = Query(None, ge=1, le=1440, description="sample step in minutes; wins over step_h"),
     template_id: str | None = Query(None),
     max_night_h: int | None = Query(None),
     max_no_earth_h: int | None = Query(None),
@@ -287,7 +288,8 @@ def site(
 
     site_obj = Site(lat_deg=lat_v, lon_deg=lon_v, observer_height_m=2.0)
     try:
-        times = parse_time_window(start_v, end_v, step_h=step_h)
+        step_m = int(step_min) if step_min is not None else int(step_h) * 60
+        times = parse_time_window(start_v, end_v, step_min=step_m)
         return build_planner_payload(
             site_obj,
             times,
@@ -297,6 +299,7 @@ def site(
             bridge_h=bridge,
             hazards_enabled=hazards_enabled,
             local_search=local_search == 1,
+            step_min=step_m,
         )
     except FileNotFoundError as e:
         raise HTTPException(
@@ -326,6 +329,7 @@ class DeepSearchBody(BaseModel):
     hazards_enabled: bool = False
     format: str = Field(default="json", description="json | csv")
     mock: bool = Field(default=False, description="Synthetic rows for UI checks; needs no kernels or cap index")
+    step_min: int = Field(default=60, ge=1, le=60, description="sample step in minutes; 60 = coarse default, 10 = fine (D-91c6)")
 
 
 def _iso_row(row: dict | None) -> dict | None:
@@ -418,6 +422,8 @@ def deep_search_endpoint(body: DeepSearchBody):
 
     n_starts = len(span) - wh
     starts = span[:n_starts]
+    step_m = int(body.step_min)
+    fine_span = span if step_m == 60 else parse_time_window(body.start, body.end, step_min=step_m)
     sites = [c[0] for c in cells]
     site_xy = [(c[1], c[2]) for c in cells]
 
@@ -437,16 +443,17 @@ def deep_search_endpoint(body: DeepSearchBody):
         _site, _x, _y, tx, ty, row = cells[idx]
         horizon = mask_from_cap_tile(tx, ty, row)
         if idx not in sky_by_site:
-            sky_by_site[idx] = eph.sky(candidate, span)
+            sky_by_site[idx] = eph.sky(candidate, fine_span)
         t0 = np.datetime64(start, "s")
-        i0 = int((t0 - np.datetime64(span[0], "s")) / np.timedelta64(1, "h"))
-        sky_win = sky_by_site[idx][i0 : i0 + int(hours) + 1]
+        i0 = int((t0 - np.datetime64(fine_span[0], "s")) / np.timedelta64(step_m, "m"))
+        sky_win = sky_by_site[idx][i0 : i0 + int(hours) * 60 // step_m + 1]
         vis = vis_series(
             sky_win,
             horizon,
             sun_threshold=sun_thr,
             earth_threshold=earth_thr,
             bridge_h=bridge,
+            step_min=step_m,
         )
         return {"series": vis, "hazards": {}, "hazard_gap_star": False}
 
