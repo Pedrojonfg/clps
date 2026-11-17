@@ -95,7 +95,41 @@ def _schedule_layer0(series: dict, needs: dict) -> list[str]:
     return failing
 
 
-def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
+_SIGMA_LN_DUST = 0.6  # relative spread of the soil-resistance proxy (D-20261117-pj-e3a7, provisional)
+
+
+def _hazard_margin_ps(hazards: dict, needs: dict) -> tuple[list[float], dict]:
+    """Layer-1 margin terms for temperature and dust (D-20261117-pj-e3a7). Only for limits the user set;
+    temperature needs a spread (none -> layer 0 only, noted in provenance)."""
+    ps: list[float] = []
+    used: dict = {}
+    sigma_t = _hazard_field(hazards, "temperature_sigma_k")  # at the hottest hour
+    sigma_t_min = _hazard_field(hazards, "temperature_min_sigma_k")  # at the coldest hour
+    if sigma_t_min is None:
+        sigma_t_min = sigma_t
+    temp_k = _hazard_field(hazards, "temperature_k")
+    temp_min = _hazard_field(hazards, "temperature_min_k")
+    if temp_min is None:
+        temp_min = temp_k
+    max_t, min_t = needs.get("max_temperature_k"), needs.get("min_temperature_k")
+    if (max_t is not None or min_t is not None) and temp_k is not None:
+        if sigma_t is None or float(sigma_t) <= 0:
+            used["temperature"] = "no_spread_layer0_only"
+        else:
+            used["temperature"] = {"sigma_k": float(sigma_t), "source": "pcp_spatial_and_adjacent_bin_spread_v1"}
+            if max_t is not None:
+                ps.append(_phi((float(max_t) - float(temp_k)) / float(sigma_t)))
+            if min_t is not None and temp_min is not None and float(sigma_t_min) > 0:
+                ps.append(_phi((float(temp_min) - float(min_t)) / float(sigma_t_min)))
+    min_res = needs.get("min_soil_resistance")
+    res = _hazard_field(hazards, "soil_resistance")
+    if min_res is not None and float(min_res) > 0 and res is not None and float(res) > 0:
+        used["dust"] = {"sigma_ln": _SIGMA_LN_DUST, "source": "metzger_2024_input_ranges_provisional"}
+        ps.append(_phi(math.log(float(res) / float(min_res)) / _SIGMA_LN_DUST))
+    return ps, used
+
+
+def _layer1_score(series: dict, needs: dict, hazards: dict | None = None) -> tuple[float, float, float]:
     """R, B, capped R*(1+βB) — computed even when layer-0 slacks are negative. # D-5577"""
     max_no_earth = int(needs["max_no_earth_h"])
     min_lit = int(needs.get("min_continuous_lit_h", 0))
@@ -128,6 +162,9 @@ def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
         ps.append(_phi(slack_total / _SIGMA_TOTAL_LIT))
         terms.append((0.1, _clip01(slack_total / max(min_total_lit, 1))))
 
+    hz_ps, _ = _hazard_margin_ps(hazards or {}, needs)
+    ps.extend(hz_ps)
+
     if "sun_fraction" in series:
         n_div = max(len(series["sun_fraction"]) * float(series.get("step_min", 60)) / 60.0, 1.0)
     else:
@@ -151,13 +188,15 @@ def _layer1_score(series: dict, needs: dict) -> tuple[float, float, float]:
 def score(series: dict, hazards: dict, needs: dict) -> dict:
     failing = _schedule_layer0(series, needs)
     failing.extend(_surface_layer0(hazards, needs))
-    r, b, companion = _layer1_score(series, needs)
+    r, b, companion = _layer1_score(series, needs, hazards)
+    _, hazard_margins = _hazard_margin_ps(hazards or {}, needs)
     gap_star = _hazard_gap_star(hazards, needs)
 
     provenance = {
         "score_formula": FORMULA,
         "schedule_version": series.get("schedule_version", "n/a"),
         "decisions": ["D-7520", "D-6ce5", "D-48ee", "D-7af3", "D-9e53", "D-5cfa", "D-5577", "D-f57e"],
+        "hazard_margins": hazard_margins,
         "sigmas_h": {
             "night": _SIGMA_NIGHT,
             "lit": _SIGMA_LIT,

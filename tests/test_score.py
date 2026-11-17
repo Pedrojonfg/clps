@@ -533,3 +533,56 @@ def test_min_total_lit_h_layer0_and_layer1() -> None:
     near = score(series, {}, {**base, "min_total_lit_h": 9})
     far = score(series, {}, {**base, "min_total_lit_h": 2})
     assert near["feasible"] and far["feasible"] and far["score"] > near["score"]
+
+
+def _hz(temp, sigma, res=1.0):
+    return {"temperature_k": temp, "temperature_min_k": temp, "temperature_sigma_k": sigma, "soil_resistance": res}
+
+
+def test_hazard_margins_enter_layer1_risk() -> None:
+    from lunar_eval.score import score
+
+    series = {
+        "sun_fraction": [1.0] * 24, "earth_fraction": [1.0] * 24, "step_min": 60,
+        "longest_night_h": 0, "longest_no_earth_h": 0, "longest_lit_h": 24,
+        "hours_sun_above_threshold": 24, "hours_earth_above_threshold": 24,
+    }
+    needs = {"max_night_h": 12, "max_no_earth_h": 12, "max_temperature_k": 320.0}
+    far = score(series, _hz(250.0, 5.0), needs)
+    close = score(series, _hz(318.0, 5.0), needs)
+    assert far["feasible"] and close["feasible"]  # both under the limit: layer 0 unchanged
+    assert far["score"] > close["score"]  # but the margin now counts
+    assert far["provenance"]["hazard_margins"]["temperature"]["sigma_k"] == 5.0
+    over = score(series, _hz(330.0, 5.0), needs)
+    assert over["feasible"] is False and over["score"] == 0
+
+
+def test_hazard_margin_without_sigma_stays_layer0_only() -> None:
+    from lunar_eval.score import score
+
+    series = {
+        "sun_fraction": [1.0] * 24, "earth_fraction": [1.0] * 24, "step_min": 60,
+        "longest_night_h": 0, "longest_no_earth_h": 0, "longest_lit_h": 24,
+        "hours_sun_above_threshold": 24, "hours_earth_above_threshold": 24,
+    }
+    needs = {"max_night_h": 12, "max_no_earth_h": 12, "max_temperature_k": 320.0}
+    a = score(series, _hz(250.0, None), needs)
+    b = score(series, _hz(318.0, None), needs)
+    assert a["score"] == b["score"]
+    assert a["provenance"]["hazard_margins"]["temperature"] == "no_spread_layer0_only"
+
+
+def test_dust_margin_is_relative_and_only_with_a_positive_limit() -> None:
+    from lunar_eval.score import score
+
+    series = {
+        "sun_fraction": [1.0] * 24, "earth_fraction": [1.0] * 24, "step_min": 60,
+        "longest_night_h": 0, "longest_no_earth_h": 0, "longest_lit_h": 24,
+        "hours_sun_above_threshold": 24, "hours_earth_above_threshold": 24,
+    }
+    base = {"max_night_h": 12, "max_no_earth_h": 12}
+    no_limit = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.0})
+    assert "dust" not in no_limit["provenance"]["hazard_margins"]
+    tight = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.80})
+    ample = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.10})
+    assert tight["feasible"] and ample["feasible"] and ample["score"] > tight["score"]

@@ -55,6 +55,37 @@ class _BinCache:
     tbol: NDArray[np.float32]
 
 
+SPREAD_RADIUS_M = 300.0  # ~ the 3x3 pixel neighbourhood of a 240 m pixel (1 km mixed lit and shaded terrain, ~100 K); spatial spread of the climatology around the site (D-20261117-pj-e3a7)
+
+
+def spread_k(
+    cache: _BinCache,
+    neighbours: list[_BinCache],
+    xn: float,
+    yn: float,
+    *,
+    radius_m: float = SPREAD_RADIUS_M,
+) -> float | None:
+    """Spread of the climatology around a site, in K: spatial std of the pixels within `radius_m` and the mean
+    change to the adjacent local-time bins at the nearest pixel, in quadrature. It is variability of the
+    climatology (terrain and timing), not instrument error. # per D-20261117-pj-e3a7 (temperature, v1 only)"""
+    dx, dy = cache.x - xn, cache.y - yn
+    d2 = dx * dx + dy * dy
+    r = radius_m / R_M
+    near = d2 <= r * r
+    sigma_space = float(np.std(cache.tbol[near])) if int(near.sum()) >= 4 else 0.0
+    i0 = int(np.argmin(d2))
+    t0 = float(cache.tbol[i0])
+    diffs: list[float] = []
+    for nb in neighbours:
+        j = int(np.argmin((nb.x - xn) ** 2 + (nb.y - yn) ** 2))
+        diffs.append(abs(float(nb.tbol[j]) - t0))
+    sigma_time = float(np.mean(diffs)) if diffs else 0.0
+    if int(near.sum()) < 4 and not diffs:
+        return None
+    return math.hypot(sigma_space, sigma_time)
+
+
 @dataclass
 class PolarPcpClimatology:
     """Spatial LST-bin lookup against converted PCP npz files."""
@@ -224,3 +255,23 @@ class PolarPcpClimatology:
         temp = float(value)
         self._value_cache[value_key] = (temp, dict(meta))
         return temp, meta
+
+    def sigma_at_site_time(self, time_utc: np.datetime64, lat_deg: float, lon_deg: float) -> float | None:
+        """Spread (K) of the climatology at a site and time; None when the bin is not available."""
+        from lunar_eval.horizon import polar_stereo_xy
+
+        season = _south_season(time_utc)
+        bin0 = lst_bin_index(local_solar_time_h_from_utc(time_utc, lon_deg))
+        cache = self._load_bin(season, bin0 + 1)
+        if cache is None:
+            return None
+        x_m, y_m = polar_stereo_xy(lat_deg, lon_deg)
+        nbs = [
+            c
+            for c in (
+                self._load_bin(season, (bin0 - 1) % 96 + 1),
+                self._load_bin(season, (bin0 + 1) % 96 + 1),
+            )
+            if c is not None
+        ]
+        return spread_k(cache, nbs, x_m / R_M, y_m / R_M)

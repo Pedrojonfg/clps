@@ -5,10 +5,11 @@ from __future__ import annotations
 import math
 
 G_M = 1.62
-# ponytail: Apollo-typical regolith until polar maps are wired
-RHO_BULK_KG_M3 = 1500.0
-MEAN_GRAIN_M = 70e-6
-COHESION_PA = 500.0
+# D-20261117-pj-c82e: Metzger (2024) lunar baseline, provisional. alpha is the cohesive ENERGY density (J/m^3),
+# not Mohr-Coulomb cohesion (Pa). Result is in J/m^3.
+RHO_BULK_KG_M3 = 1300.0
+MEAN_D_M = 1.5 * 2.3 * 77.5e-6  # <D> = 1.5 * D84, D84 = 2.3 * D50, D50 = 77.5 um
+ALPHA_J_M3 = 0.289
 # Engineering floor near-vertical cells (D-06cb); not a Metzger claim
 BETA_FLOOR = 0.05
 
@@ -16,7 +17,7 @@ BETA_FLOOR = 0.05
 def soil_resistance(slope_deg: float) -> float:
     """Metzger soil-side denominator: ρ g D β + α with β = cos(θ) (D-06cb)."""
     beta = max(BETA_FLOOR, math.cos(math.radians(slope_deg)))
-    return RHO_BULK_KG_M3 * G_M * MEAN_GRAIN_M * beta + COHESION_PA
+    return RHO_BULK_KG_M3 * G_M * MEAN_D_M * beta + ALPHA_J_M3
 
 
 def soil_provenance(slope_deg: float) -> dict:
@@ -30,6 +31,8 @@ def soil_provenance(slope_deg: float) -> dict:
         "beta_floor": BETA_FLOOR,
         "slope_deg": slope_deg,
         "slope_product": "pgda_ldsm",
-        "soil_constants": "apollo_average_grain_cohesion_bulk_density",
-        "decision": "D-20261115-pj-06cb",
+        "soil_constants": "metzger_2024_lunar_baseline",
+        "alpha_label": "cohesive_energy_density_not_mohr_coulomb",
+        "units": "J/m3",
+        "decision": "D-20261117-pj-c82e",
     }

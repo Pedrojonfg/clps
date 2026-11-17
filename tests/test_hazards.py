@@ -26,11 +26,13 @@ def test_quadrant_idw_fills_centre_from_neighbors() -> None:
 
 
 def test_soil_resistance_decreases_with_slope_metzger_beta() -> None:
-    # D-06cb: R = ρgD·cos(θ)+α → steeper slope lowers the grain term
+    # D-06cb β rule, D-c82e constants: R = ρgD·cos(θ)+α in J/m³; slope must now be visible
     flat = soil_resistance(0.0)
     steep = soil_resistance(45.0)
     assert steep < flat
-    assert flat == pytest.approx(1500.0 * 1.62 * 70e-6 * 1.0 + 500.0)
+    assert flat == pytest.approx(1300.0 * 1.62 * (1.5 * 2.3 * 77.5e-6) + 0.289)
+    assert flat == pytest.approx(0.85, abs=0.01)
+    assert (flat - steep) / flat > 0.15  # with α in J/m³ the grain term is ~2/3 of the total
 
 
 def test_climatology_lookup_by_lst_bin() -> None:
@@ -103,3 +105,23 @@ def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
     assert val == pytest.approx(210.0)
     assert meta["lst_bin"] == 0
     assert meta["product"].startswith("urn:nasa:pds:lro_diviner_derived1")
+
+def test_spread_k_combines_spatial_and_adjacent_bin_spread() -> None:
+    from lunar_eval.hazards.pcp import R_M, _BinCache, spread_k
+
+    n = 100
+    step = 240.0 / R_M
+    gx = (np.arange(n) % 10) * step
+    gy = (np.arange(n) // 10) * step
+    base = _BinCache(x=gx, y=gy, tbol=np.linspace(80.0, 90.0, n).astype(np.float32))
+    flat_t = _BinCache(x=gx, y=gy, tbol=np.full(n, 85.0, dtype=np.float32))
+    warm = _BinCache(x=gx, y=gy, tbol=base.tbol + 4.0)
+
+    sigma_flat = spread_k(flat_t, [], gx[0], gy[0], radius_m=1000.0)
+    assert sigma_flat == 0.0  # no spatial spread, no neighbours' change
+    sigma_time = spread_k(
+        flat_t, [_BinCache(x=gx, y=gy, tbol=np.full(n, 89.0, dtype=np.float32))], gx[0], gy[0], radius_m=1000.0
+    )
+    assert sigma_time == pytest.approx(4.0)
+    assert spread_k(base, [warm], gx[0], gy[0], radius_m=1000.0) > spread_k(flat_t, [], gx[0], gy[0], radius_m=1000.0)
+    assert spread_k(_BinCache(x=gx[:2], y=gy[:2], tbol=base.tbol[:2]), [], gx[0], gy[0]) is None
