@@ -256,12 +256,6 @@ def site(
     from lunar_eval.planner_templates import DEMO_SITE01, template_needs
     from lunar_eval.providers import Site
 
-    if not kernels_available():
-        raise HTTPException(
-            status_code=503,
-            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk; use mock=1 in CI."},
-        )
-
     tpl = template_needs(template_id)
     lat_v = float(lat if lat is not None else DEMO_SITE01["lat_deg"])
     lon_v = float(lon if lon is not None else DEMO_SITE01["lon_deg"])
@@ -292,6 +286,12 @@ def site(
                 status_code=422,
                 detail="energy mode needs battery_wh, array_w and dark_w (or endurance_h)",
             )
+    if not kernels_available():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk; use mock=1 in CI."},
+        )
+
     # per D-20261117-pj-0c5e: explicit hazard limit > template > global default; empty = off
     for key, raw in (
         ("max_temperature_k", max_temperature_k),
