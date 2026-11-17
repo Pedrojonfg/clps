@@ -3,6 +3,16 @@ import type { MissionTemplate, PlannerForm, RegionSearchSummary, SitePayload } f
 /** Static browser demo (GitHub Pages): no API; reads JSON exported from the API's mock mode. */
 export const STATIC_DEMO = import.meta.env.VITE_STATIC_DEMO === "1";
 const BASE = import.meta.env.BASE_URL;
+/**
+ * Origin of the evaluator API: the engine the desktop app bundles (set at startup), or a build-time
+ * `VITE_API_BASE`. Empty = same origin, i.e. the Vite dev proxy to a local API.
+ */
+export let API_BASE = ((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "");
+/** Set once at startup by the Tauri shell to the bundled engine's loopback origin. */
+export function setApiBase(origin: string): void {
+  API_BASE = origin.replace(/\/$/, "");
+}
+export const apiUrl = (path: string) => `${API_BASE}${path}`;
 
 function toUtcIso(localValue: string): string {
   if (!localValue) return "";
@@ -38,7 +48,7 @@ export function buildSiteQuery(form: PlannerForm): string {
 }
 
 export async function fetchTemplates(): Promise<MissionTemplate[]> {
-  const res = await fetch(STATIC_DEMO ? `${BASE}demo/mission-templates.json` : "/mission-templates");
+  const res = await fetch(STATIC_DEMO ? `${BASE}demo/mission-templates.json` : apiUrl("/mission-templates"));
   if (!res.ok) throw new Error(`templates HTTP ${res.status}`);
   const body = (await res.json()) as { templates: MissionTemplate[] };
   return body.templates ?? [];
@@ -47,7 +57,7 @@ export async function fetchTemplates(): Promise<MissionTemplate[]> {
 export async function fetchSite(form: PlannerForm): Promise<SitePayload> {
   // ponytail: the API's mock ignores the form too, so one exported payload is faithful.
   const res = await fetch(
-    STATIC_DEMO ? `${BASE}demo/site-mock.json` : `/site?${buildSiteQuery(form)}`,
+    STATIC_DEMO ? `${BASE}demo/site-mock.json` : apiUrl(`/site?${buildSiteQuery(form)}`),
   );
   const body = await res.json();
   if (!res.ok) {
@@ -55,13 +65,18 @@ export async function fetchSite(form: PlannerForm): Promise<SitePayload> {
       body?.detail?.message || body?.detail?.error || body?.detail || res.statusText;
     throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
   }
+  // The exported demo payload always carries the local search; the API only adds it when asked,
+  // so drop it here when "Single window" is selected and the mode toggle behaves the same.
+  if (STATIC_DEMO && !form.local_search) delete body.local_search;
   return body as SitePayload;
 }
 
 /** Same-origin URLs via Vite proxy — localStorage ion token is shared with the iframe. */
-export function firstPersonUrl(form: PlannerForm): string {
+export function firstPersonUrl(form: PlannerForm, mode2d = false): string {
   const p = new URLSearchParams(buildSiteQuery(form));
   if (STATIC_DEMO) p.set("static", "1");
+  if (API_BASE) p.set("api", API_BASE);
+  if (mode2d) p.set("mode", "2d");
   return `${BASE}firstperson.html?${p.toString()}`;
 }
 
@@ -70,6 +85,7 @@ export function regionMapUrl(form: PlannerForm, demo = false, moon = false): str
   if (demo || STATIC_DEMO) p.set("demo", "1");
   if (moon) p.set("moon", "1");
   if (STATIC_DEMO) p.set("static", "1");
+  if (API_BASE) p.set("api", API_BASE);
   return `${BASE}map.html?${p.toString()}`;
 }
 
@@ -101,7 +117,7 @@ export async function runRegionSearch(
   const nums = Object.values(rect).map(Number);
   if (nums.some((n) => !Number.isFinite(n))) throw new Error("The rectangle needs four numbers.");
 
-  const res = await fetch("/deep-search", {
+  const res = await fetch(apiUrl("/deep-search"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

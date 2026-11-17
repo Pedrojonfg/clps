@@ -187,4 +187,6 @@ def build_planner_payload(
 
 
 def kernels_available() -> bool:
-    return (Path(__file__).resolve().parents[1] / "data" / "kernels" / "de440s.bsp").is_file()
+    from lunar_eval.horizon.remote import locate
+
+    return locate("kernels/de440s.bsp") is not None

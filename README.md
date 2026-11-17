@@ -97,19 +97,25 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
 
 - **The browser demo is mocked.** It has no server, so it always shows the
   same sample result. Inputs and mission presets do not change it.
-- **You need local data for real results.** Computed results need about 14 GB
-  of local data: elevation models (~11 GB), hazard rasters (~2 GB), SPICE
-  kernels and the precomputed masks. None of it is in the repo. Without that
-  data the app runs in **mock mode**: the full interface and score logic work,
-  but the horizon is a stand-in curve, and the app labels it as mocked.
-- **Masks are not downloadable yet.** The 1 km mask set exists, but it is not
-  published anywhere. To run deep search you have to generate it yourself
-  (overnight run).
+- **Real results download their data on first use.** The 1 km masks (~880 MB),
+  SPICE kernels (44 MB) and hazard data (~2 GB) are static files in a
+  Cloudflare R2 bucket (`masks.pedrojon.com`). The engine fetches only what a
+  request needs, checks a sha256, caches it under the user cache directory
+  (`LUNAR_CACHE` to change it) and works offline afterwards.
+  `LUNAR_STORE_URL=off` disables the download. Elevation models (~11 GB) are
+  only needed to regenerate masks, never on a client. Without data the app
+  falls back to **mock mode**, labelled as mocked. `scripts/publish_masks.py`
+  uploads a new data set.
+- **Without DEMs a site snaps to its 1 km cell.** A client machine has no
+  elevation models, so any site takes the mask of the nearest 1 km cap cell
+  (up to ~0.7 km away).
 - **1 km mask spacing.** The precomputed set has one mask every 1 km. Single
   sites outside it are computed on demand. Small-scale terrain between grid
   points can be missed.
-- **The desktop app needs the Python API running.** It talks to a local
-  FastAPI server, so for now it runs in development mode next to that server.
+- **The desktop app bundles its engine.** `deploy/build-desktop.sh` packs the
+  Python evaluator as a Tauri sidecar that the app starts and stops itself, on
+  a loopback port. Installers are built once per operating system. In
+  development you can still run `deploy/run-local.sh`.
   There is no packaged installer yet.
 - **The 3D view needs a Cesium ion token** (free account) whose account has
   *Cesium Moon Terrain* (asset 2684829) added from the ion Asset Depot.
@@ -183,9 +189,8 @@ run `localStorage.setItem('cesium_ion_token', '<token>')` and reload.
   you don't need to start a server by hand.
 - **Finer masks over the whole cap:** move from 1 km to 100 m spacing over
   the full south polar cap.
-- **Hosted masks:** publish the precomputed masks and serve them through an
-  API. Then the app, and the browser demo, give computed results without the
-  14 GB of local data.
+- **Browser demo with real data:** the browser demo is still mocked; the
+  engine needs Python, so it only runs inside the desktop app.
 - **Run the remaining validation:** the short-night re-check and the PGDA
   illumination comparison, with results published in
   [`docs/validation.md`](docs/validation.md).
