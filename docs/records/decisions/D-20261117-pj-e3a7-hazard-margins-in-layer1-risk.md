@@ -67,7 +67,7 @@ about one decade (σ_ln ≈ 0.6). The earlier Apollo kPa ranges (Mohr-Coulomb co
 4. **D — Propagated spread (dust)**: interval/Monte-Carlo propagation of the constants' ranges through the
    proxy.
 
-**Decided by pj:** C for temperature, **for v1 only; to be reopened** (a published or better-grounded spread, or
+**Decided by pj:** C for temperature (the adjacent-bin part was dropped in `D-3d8b`: spatial spread only), **for v1 only; to be reopened** (a published or better-grounded spread, or
 the calibration error, should replace it). For dust, D, **grounded in scientific research** (deep-research pass
 to verify the constants' ranges and find the best-supported spread); until it lands the dust σ stays open.
 Both labelled provisional in provenance.

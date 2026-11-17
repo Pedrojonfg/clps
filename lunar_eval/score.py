@@ -116,7 +116,7 @@ def _hazard_margin_ps(hazards: dict, needs: dict) -> tuple[list[float], dict]:
         if sigma_t is None or float(sigma_t) <= 0:
             used["temperature"] = "no_spread_layer0_only"
         else:
-            used["temperature"] = {"sigma_k": float(sigma_t), "source": "pcp_spatial_and_adjacent_bin_spread_v1"}
+            used["temperature"] = {"sigma_k": float(sigma_t), "source": "pcp_spatial_spread_v1"}
             if max_t is not None:
                 ps.append(_phi((float(max_t) - float(temp_k)) / float(sigma_t)))
             if min_t is not None and temp_min is not None and float(sigma_t_min) > 0:

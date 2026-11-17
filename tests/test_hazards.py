@@ -106,22 +106,18 @@ def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
     assert meta["lst_bin"] == 0
     assert meta["product"].startswith("urn:nasa:pds:lro_diviner_derived1")
 
-def test_spread_k_combines_spatial_and_adjacent_bin_spread() -> None:
+def test_spread_k_is_spatial_only() -> None:
     from lunar_eval.hazards.pcp import R_M, _BinCache, spread_k
 
     n = 100
     step = 240.0 / R_M
     gx = (np.arange(n) % 10) * step
     gy = (np.arange(n) // 10) * step
-    base = _BinCache(x=gx, y=gy, tbol=np.linspace(80.0, 90.0, n).astype(np.float32))
-    flat_t = _BinCache(x=gx, y=gy, tbol=np.full(n, 85.0, dtype=np.float32))
-    warm = _BinCache(x=gx, y=gy, tbol=base.tbol + 4.0)
-
-    sigma_flat = spread_k(flat_t, [], gx[0], gy[0], radius_m=1000.0)
-    assert sigma_flat == 0.0  # no spatial spread, no neighbours' change
-    sigma_time = spread_k(
-        flat_t, [_BinCache(x=gx, y=gy, tbol=np.full(n, 89.0, dtype=np.float32))], gx[0], gy[0], radius_m=1000.0
-    )
-    assert sigma_time == pytest.approx(4.0)
-    assert spread_k(base, [warm], gx[0], gy[0], radius_m=1000.0) > spread_k(flat_t, [], gx[0], gy[0], radius_m=1000.0)
-    assert spread_k(_BinCache(x=gx[:2], y=gy[:2], tbol=base.tbol[:2]), [], gx[0], gy[0]) is None
+    uniform = _BinCache(x=gx, y=gy, tbol=np.full(n, 85.0, dtype=np.float32))
+    ramp = _BinCache(x=gx, y=gy, tbol=np.linspace(80.0, 90.0, n).astype(np.float32))
+    assert spread_k(uniform, gx[0], gy[0], radii_m=(1000.0,)) == 0.0
+    assert spread_k(ramp, gx[0], gy[0], radii_m=(1000.0,)) > 0.0
+    # The radius widens until 4 pixels are found: a tight first radius falls through to the next one.
+    assert spread_k(ramp, gx[0], gy[0], radii_m=(10.0, 1000.0)) == spread_k(ramp, gx[0], gy[0], radii_m=(1000.0,))
+    # Fewer than 4 pixels near the site: no spread (the margin then stays layer 0 only).
+    assert spread_k(_BinCache(x=gx[:2], y=gy[:2], tbol=ramp.tbol[:2]), gx[0], gy[0]) is None
