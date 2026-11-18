@@ -188,7 +188,7 @@ export function PlannerScreen({
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12 }}>
                 <span>First use: downloading data</span>
                 <span className={Classes.MONOSPACE_TEXT} style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {dl.total > 0 ? Math.round((100 * dl.done) / dl.total) : 0} %
+                  {dl.total > 0 ? Math.min(100, Math.round((100 * dl.done) / dl.total)) : 0} %
                 </span>
               </div>
               <ProgressBar
