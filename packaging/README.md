@@ -17,7 +17,6 @@ What is published where, and what to do on each release `vX.Y.Z`.
 
 ## Open points
 
-- **No LICENSE file** in the repo; winget needs a license field. Decide one first.
 - The macOS build is Apple Silicon only (`macos-latest`); the cask says `depends_on arch: :arm64`.
 - File names were checked against the CI artifacts of run 44186563271 (`_x64-setup.exe`, `_x64_en-US.msi`, `_aarch64.dmg`); recheck on the first real release.
 - Linux packages are attached to the release only; no apt/dnf repository.
