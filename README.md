@@ -226,3 +226,7 @@ docs/         validation notes, demo data notes, design records
 
 The design history and the reasons behind each choice are in
 [`docs/records/`](docs/records/).
+
+## License
+
+[MIT](LICENSE).
