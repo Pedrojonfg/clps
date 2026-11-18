@@ -177,7 +177,9 @@ The native window needs the
 them, run `npm run dev` and open http://localhost:1420 in a browser. You get the
 same screens.
 
-With no local data, keep **Mock** turned on in *New analysis*. You can still
+The app uses real data by default: with no local data the engine downloads
+what it needs from the data store on first use. To try the interface without
+any data or network, tick **Mock data (demo)** in *New analysis*. You can still
 try the whole flow: run an analysis, read the score and charts, save it, open
 the region map.
 
@@ -191,7 +193,7 @@ python scripts/fetch_pcp_bins.py
 python scripts/precompute.py  # 1 km mask cap (overnight)
 ```
 
-Then turn **Mock** off to get computed masks for any south-polar site. Deep
+With them on disk the engine uses them instead of downloading. Deep
 search becomes available once the mask cap is on disk.
 
 **3D view token:** create a free token at

@@ -48,7 +48,7 @@ const initialForm: PlannerForm = {
   require_both: false,
   hazards_enabled: true,
   local_search: false,
-  mock: true,
+  mock: false, // real data by default; the browser demo forces mock via STATIC_DEMO
 };
 
 const NAV: { id: AppScreen; label: string; icon: "timeline-events" | "plus" | "globe" | "map" }[] =
