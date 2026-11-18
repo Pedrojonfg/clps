@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
+import threading
 import urllib.error
 import time
 import urllib.request
@@ -103,6 +103,39 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+_progress_lock = threading.Lock()
+_IDLE_AFTER_S = 3.0  # no download activity for this long => idle (files arrive one after another)
+_progress: dict = {"file": None, "done": 0, "total": 0, "files_done": 0, "bytes_done": 0, "updated": 0.0}
+
+
+def download_progress() -> dict:
+    """Snapshot of the download in flight, for the UI. ``active`` is False when idle."""
+    with _progress_lock:
+        p = dict(_progress)
+    p["active"] = time.monotonic() - p.pop("updated") < _IDLE_AFTER_S
+    return p
+
+
+def _progress_start(rel: str, total: int) -> None:
+    with _progress_lock:
+        if time.monotonic() - _progress["updated"] >= _IDLE_AFTER_S:
+            _progress.update(files_done=0, bytes_done=0)
+        _progress.update(file=rel, done=0, total=int(total), updated=time.monotonic())
+
+
+def _progress_add(n: int) -> None:
+    with _progress_lock:
+        _progress["done"] += n
+        _progress["bytes_done"] += n
+        _progress["updated"] = time.monotonic()
+
+
+def _progress_finish() -> None:
+    with _progress_lock:
+        _progress["files_done"] += 1
+        _progress["updated"] = time.monotonic()
+
+
 def ensure_file(rel: str, dest_root: Path, base: str, manifest: dict) -> Path:
     """Return ``dest_root/rel``, downloading and verifying it if missing or stale."""
     entry = manifest["files"].get(rel)
@@ -113,12 +146,16 @@ def ensure_file(rel: str, dest_root: Path, base: str, manifest: dict) -> Path:
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
+    _progress_start(rel, entry["size"])
     try:
         with _get(f"{base}/{rel}") as r, part.open("wb") as out:
-            shutil.copyfileobj(r, out, 1 << 20)
+            while chunk := r.read(1 << 20):
+                out.write(chunk)
+                _progress_add(len(chunk))
         if _sha256(part) != entry["sha256"]:
             raise OSError(f"checksum mismatch for {rel}")
         part.replace(dest)
+        _progress_finish()
     finally:
         part.unlink(missing_ok=True)
     return dest

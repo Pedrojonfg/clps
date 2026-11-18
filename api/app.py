@@ -196,6 +196,14 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/progress")
+def progress() -> dict[str, Any]:
+    """Data-store download in flight (file, bytes, totals); ``active`` false when idle."""
+    from lunar_eval.horizon.remote import download_progress
+
+    return download_progress()
+
+
 @app.post("/region-map")
 def region_map(body: RegionMapBody) -> dict[str, Any]:
     from lunar_eval.region_map import build_region_map

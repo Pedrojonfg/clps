@@ -14,7 +14,9 @@ import {
   Tabs,
   Tag,
 } from "@blueprintjs/core";
-import { STATIC_DEMO, fetchSite, fetchTemplates } from "../api";
+import { STATIC_DEMO, fetchProgress, fetchSite, fetchTemplates, type DownloadProgress } from "../api";
+
+const mb = (bytes: number) => (bytes / 1e6).toFixed(bytes >= 1e8 ? 0 : 1);
 import { LocalSearchBoard } from "../LocalSearchBoard";
 import { SiteResult } from "../SiteCharts";
 import { DEMO_SITE, MissionTemplate, PlannerForm, SitePayload, energyOn } from "../types";
@@ -42,8 +44,27 @@ export function PlannerScreen({
 }: Props) {
   const [templates, setTemplates] = useState<MissionTemplate[]>([]);
   const [status, setStatus] = useState("");
+
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dl, setDl] = useState<DownloadProgress | null>(null);
+
+  // While an analysis runs, ask the engine whether it is downloading data (first use, D-8c03).
+  useEffect(() => {
+    if (!busy) {
+      setDl(null);
+      return;
+    }
+    let live = true;
+    const id = window.setInterval(async () => {
+      const p = await fetchProgress();
+      if (live) setDl(p?.active ? p : null);
+    }, 1000);
+    return () => {
+      live = false;
+      window.clearInterval(id);
+    };
+  }, [busy]);
   // Setup / Results split (D-20261117-pj-3b71); coming back with a result shows it.
   const [view, setView] = useState<"setup" | "results">(data ? "results" : "setup");
   const [tab, setTab] = useState<"overview" | "best">("overview");
@@ -161,6 +182,12 @@ export function PlannerScreen({
       {status && (
         <Callout style={{ marginBottom: 8 }}>
           {busy && <Spinner size={16} />} {status}
+          {dl && (
+            <div className={Classes.TEXT_MUTED} style={{ marginTop: 4, fontSize: 12 }}>
+              First use: downloading data — {dl.file} ({mb(dl.done)} / {mb(dl.total)} MB) · {dl.files_done} files,{" "}
+              {mb(dl.bytes_done)} MB so far. It is stored on this machine and not downloaded again.
+            </div>
+          )}
         </Callout>
       )}
       {error && (
