@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-UA = "lunar-eval/0.1 (+https://github.com/Pedrojonfg/clps)"
+UA = "moonpark/0.1 (+https://github.com/Pedrojonfg/moonpark)"
 OUT = Path(__file__).resolve().parent.parent / "tests/fixtures/horizons"
 SITES = {
     "Site01": (-89.46316, 222.51045),

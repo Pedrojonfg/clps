@@ -1,4 +1,4 @@
-# lunar-eval desktop
+# moonpark desktop
 
 Tauri 2 + React + Blueprint shell for the product UI (`D-bdaf`, `D-50a5`, `D-b6fe`).
 Static `web/` is not this product (`D-c973`).

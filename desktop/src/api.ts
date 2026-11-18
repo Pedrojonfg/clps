@@ -123,7 +123,7 @@ export function regionMapUrl(form: PlannerForm, demo = false, moon = false): str
 }
 
 /** Key the embedded region map (web/map.js) reads its last search from. */
-const REGION_MAP_REQUEST_KEY = "clps:regionMapRequest";
+const REGION_MAP_REQUEST_KEY = "moonpark:regionMapRequest";
 
 type DeepRow = {
   site: { lat_deg: number; lon_deg: number };

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from api.app import app
+from moonpark.api.app import app
 
 client = TestClient(app)
 

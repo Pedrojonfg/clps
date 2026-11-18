@@ -1,0 +1,15 @@
+PackageIdentifier: Pedrojonfg.Moonpark
+PackageVersion: X.Y.Z
+PackageLocale: en-US
+Publisher: Pedrojonfg
+PackageName: moonpark
+License: MIT
+LicenseUrl: https://github.com/Pedrojonfg/moonpark/blob/main/LICENSE
+ShortDescription: Landing-site and time-window evaluator for the lunar south pole.
+PackageUrl: https://github.com/Pedrojonfg/moonpark
+Tags:
+  - moon
+  - space
+  - mission-planning
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

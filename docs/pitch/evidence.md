@@ -9,15 +9,15 @@ Rutas relativas a la raíz del repo. `D-xxxx` = `docs/records/decisions/D-202611
 | L3 | PGDA 69 = medias de ~18,6 años; «las medias esconden la fecha del planificador» | `docs/research/briefs/research-brief-data-viz-sources.md:58` | FACT |
 | L4 | Horizons ignora el terreno | D-41fa, D-f369 (Context) | FACT |
 | L5 | Herramientas difíciles para no especialistas; varias interfaces y datos en bruto | challenge statement :21 | FACT |
-| L6 | Pipeline SPICE + LOLA → máscara → serie → nota → búsqueda | `lunar_eval/ephemeris/spice.py:52`, `horizon/mask.py:20`, `visibility.py:57`, `score.py:116`, `search/deep.py:108` | FACT |
-| L7 | 10 plantillas de misión (Blue Ghost, VIPER, Artemis III…) | D-8588, `lunar_eval/planner_templates.py` | FACT |
+| L6 | Pipeline SPICE + LOLA → máscara → serie → nota → búsqueda | `moonpark/ephemeris/spice.py:52`, `horizon/mask.py:20`, `visibility.py:57`, `score.py:116`, `search/deep.py:108` | FACT |
+| L7 | 10 plantillas de misión (Blue Ghost, VIPER, Artemis III…) | D-8588, `moonpark/planner_templates.py` | FACT |
 | L8 | 240 m en todo el rayo → hasta 37 pp de iluminación y 1.289 h de error en la noche más larga | D-f369 (Options, A) | FACT |
 | L9 | Horizonte nunca a más de 196 km; corte a 150 km pierde 0,49° | D-f369 (Evidence, Reach) | FACT |
 | L10 | Esquema elegido: noche más larga ≤ 1 h de error en 28 puntos; la primera versión fallaba por 7 h en uno → 80 m | D-f369 (Evidence + Checks) | FACT |
 | L11 | 290.289 máscaras, 16.174 s (4,49 h), 1 km, 839 MB | `data/masks/cap_1km/summary.json`, `docs/demo-data-and-masks.md` | FACT |
 | L12 | Tolerancia 5 h = Blue Ghost M1 ~5 h con batería tras la puesta | D-f369 (Mission data, Rationale) | FACT |
 | L13 | Sin normalizar contra el mejor sitio («sería hacer trampa») | D-de42:40,71 | FACT |
-| L14 | Capa 0 fail-closed; capa 1 R = ∏Φ(slack/σ); σ = 5 h noche/luz, 1 h sin Tierra; β = 0,25 | `lunar_eval/score.py:9-13,75-159`, D-7520, D-48ee | FACT |
+| L14 | Capa 0 fail-closed; capa 1 R = ∏Φ(slack/σ); σ = 5 h noche/luz, 1 h sin Tierra; β = 0,25 | `moonpark/score.py:9-13,75-159`, D-7520, D-48ee | FACT |
 | L15 | Companion score dentro de lo infactible para guiar la búsqueda | D-5577:35, `search/deep.py` | FACT |
 | L16 | 78 decisiones (115 records en total) | `ls docs/records/decisions \| wc -l` | FACT |
 | L17 | 110 tests recogidos, 109 pasan, 1 skip intencionado, ~10 s; tests 2.176 líneas vs motor ~1.970 | ejecución de pytest 2026-11-15, `research/tests-git.md`, `research/code.md` | FACT |

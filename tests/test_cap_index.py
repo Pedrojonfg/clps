@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from lunar_eval.horizon import polar_stereo_xy
-from lunar_eval.horizon.cap_index import (
+from moonpark.horizon import polar_stereo_xy
+from moonpark.horizon.cap_index import (
     cap_index_available,
     sites_in_latlon_rect,
     sites_in_xy_rect,
 )
-from lunar_eval.site01 import SITE01
+from moonpark.site01 import SITE01
 
 pytestmark = pytest.mark.skipif(not cap_index_available(), reason="cap_1km index not present")
 
@@ -39,8 +39,8 @@ def test_latlon_rect_still_returns_cells() -> None:
 
 
 def test_nearest_cap_mask_snaps_within_a_cell():
-    from lunar_eval.horizon.cap_index import nearest_cap_mask
-    from lunar_eval.providers import Site
+    from moonpark.horizon.cap_index import nearest_cap_mask
+    from moonpark.providers import Site
 
     m = nearest_cap_mask(Site(lat_deg=-89.46316, lon_deg=222.51045, observer_height_m=2.0))
     assert m is not None and m.elevation_deg.shape == (720,)

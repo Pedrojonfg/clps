@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEM="${ROOT}/data/dem"
 PCP="${ROOT}/data/hazards/pcp"
 mkdir -p "$DEM" "$PCP"
-UA="lunar-eval/0.1 (+https://github.com/Pedrojonfg/clps)"
+UA="moonpark/0.1 (+https://github.com/Pedrojonfg/moonpark)"
 PCP_BASE="https://pds-geosciences.wustl.edu/lro/urn-nasa-pds-lro_diviner_derived1/data_derived_pcp/diurnal/ltim/pols"
 
 fetch() {

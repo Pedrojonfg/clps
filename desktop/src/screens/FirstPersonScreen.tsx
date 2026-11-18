@@ -17,7 +17,7 @@ export function FirstPersonScreen({ form }: Props) {
   // Light 2D panorama on request (slow GPU / no token). Remembered per machine.
   const [mode2d, setMode2d] = useState(() => {
     try {
-      return localStorage.getItem("clps:firstPerson2d") === "1";
+      return localStorage.getItem("moonpark:firstPerson2d") === "1";
     } catch {
       return false;
     }
@@ -28,7 +28,7 @@ export function FirstPersonScreen({ form }: Props) {
     const next = !mode2d;
     setMode2d(next);
     try {
-      localStorage.setItem("clps:firstPerson2d", next ? "1" : "0");
+      localStorage.setItem("moonpark:firstPerson2d", next ? "1" : "0");
     } catch {
       /* private mode: the choice just isn't remembered */
     }

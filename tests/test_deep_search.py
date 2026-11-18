@@ -10,9 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lunar_eval.providers import Site
-from lunar_eval.score import score
-from lunar_eval.search.deep import (
+from moonpark.providers import Site
+from moonpark.score import score
+from moonpark.search.deep import (
     DEFAULT_LEADERBOARD_N,
     DEFAULT_TMAX_S,
     deep_search,

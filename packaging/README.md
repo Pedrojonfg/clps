@@ -5,14 +5,14 @@ What is published where, and what to do on each release `vX.Y.Z`.
 | Channel | Source of truth | Status |
 |---------|-----------------|--------|
 | GitHub Release (AppImage, .deb, .rpm, Windows setup/.msi, macOS .dmg) | `.github/workflows/desktop-release.yml` on a `v*` tag (draft) | works |
-| Homebrew cask | `packaging/homebrew/lunar-eval.rb` copied to a tap repo `Pedrojonfg/homebrew-clps` | template, tap repo not created |
+| Homebrew cask | `packaging/homebrew/moonpark.rb` copied to a tap repo `Pedrojonfg/homebrew-moonpark` | template, tap repo not created |
 | winget | `packaging/winget/*.yaml`, submitted to `microsoft/winget-pkgs` | template, not submitted |
 
 ## Per release
 
 1. Push tag `vX.Y.Z`. Wait for the workflow. Check the draft release has all installers, edit the notes from `docs/RELEASE_NOTES_TEMPLATE.md`, publish it.
-2. Hashes: `sha256sum lunar-eval_X.Y.Z_aarch64.dmg lunar-eval_X.Y.Z_x64-setup.exe`.
-3. Homebrew: put the version and dmg sha256 in the cask, push it to the tap as `Casks/lunar-eval.rb`. Test with `brew install --cask Pedrojonfg/clps/lunar-eval`.
+2. Hashes: `sha256sum moonpark_X.Y.Z_aarch64.dmg moonpark_X.Y.Z_x64-setup.exe`.
+3. Homebrew: put the version and dmg sha256 in the cask, push it to the tap as `Casks/moonpark.rb`. Test with `brew install --cask Pedrojonfg/moonpark/moonpark`.
 4. winget: fill the version, URL and installer sha256 in the three YAML files, `winget validate`, then PR to `microsoft/winget-pkgs` (or `wingetcreate`).
 
 ## Open points

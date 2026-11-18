@@ -14,7 +14,7 @@ import math
 
 import pytest
 
-from lunar_eval.score import score
+from moonpark.score import score
 
 # Legacy formula id before D-7520 (do not import FORMULA — it was updated).
 OLD_FORMULA = "two_layer_zero_then_assurance_then_weights"
@@ -517,7 +517,7 @@ def test_surface_temperature_inside_both_limits_stays_feasible() -> None:
 
 
 def test_min_total_lit_h_layer0_and_layer1() -> None:
-    from lunar_eval.score import score
+    from moonpark.score import score
 
     series = {
         "sun_fraction": [1.0] * 10 + [0.0] * 14, "earth_fraction": [1.0] * 24, "step_min": 60,
@@ -540,7 +540,7 @@ def _hz(temp, sigma, res=1.0):
 
 
 def test_hazard_margins_enter_layer1_risk() -> None:
-    from lunar_eval.score import score
+    from moonpark.score import score
 
     series = {
         "sun_fraction": [1.0] * 24, "earth_fraction": [1.0] * 24, "step_min": 60,
@@ -558,7 +558,7 @@ def test_hazard_margins_enter_layer1_risk() -> None:
 
 
 def test_hazard_margin_without_sigma_stays_layer0_only() -> None:
-    from lunar_eval.score import score
+    from moonpark.score import score
 
     series = {
         "sun_fraction": [1.0] * 24, "earth_fraction": [1.0] * 24, "step_min": 60,
@@ -573,7 +573,7 @@ def test_hazard_margin_without_sigma_stays_layer0_only() -> None:
 
 
 def test_dust_margin_is_relative_and_only_with_a_positive_limit() -> None:
-    from lunar_eval.score import score
+    from moonpark.score import score
 
     series = {
         "sun_fraction": [1.0] * 24, "earth_fraction": [1.0] * 24, "step_min": 60,

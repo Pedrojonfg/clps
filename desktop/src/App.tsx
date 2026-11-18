@@ -102,7 +102,7 @@ function App() {
     <div className={Classes.DARK} style={{ minHeight: "100vh" }}>
       <Navbar>
         <NavbarGroup align={Alignment.LEFT}>
-          <NavbarHeading>lunar-eval</NavbarHeading>
+          <NavbarHeading>moonpark</NavbarHeading>
           {STATIC_DEMO && (
             <Tag intent="warning" style={{ marginRight: 8 }}>
               Browser demo · mocked data

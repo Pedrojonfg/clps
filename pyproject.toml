@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lunar-eval"
+name = "moonpark"
 version = "0.1.0"
-description = "Lunar south-pole site×time evaluator (Sun/Earth vs local horizon)"
+description = "Landing-site light and Earth-link planner for the lunar south pole"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -23,7 +23,7 @@ dev = ["pytest", "httpx", "spiceypy"]
 sky = ["spiceypy"]
 
 [tool.setuptools.packages.find]
-include = ["lunar_eval*", "api"]
+include = ["moonpark*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

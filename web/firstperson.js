@@ -1,4 +1,4 @@
-/* S10 first-person view — lunar-eval
+/* S10 first-person view — moonpark
  * D-ac34 hybrid (third-party backdrop + our mask/sky), D-7d58 CesiumJS + Cesium Moon,
  * D-f2d3 2 m observer / look-around only, D-e062 same site×time query as the planner,
  * D-671e provenance one-liner + details, D-ac74 2D mask panorama when Cesium is unavailable.

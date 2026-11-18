@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from api.app import app
-from lunar_eval.site01 import real_data_available
+from moonpark.api.app import app
+from moonpark.site01 import real_data_available
 
 client = TestClient(app)
 REPO = Path(__file__).resolve().parents[1]
@@ -121,7 +121,7 @@ def test_mock_mask_azimuth_convention_reproduces_fractions() -> None:
 
 def test_mock_local_search_block_has_real_shape_and_order() -> None:
     # per D-20261116-pj-4902: mock ships a leaderboard so the top-N UI can be checked.
-    from lunar_eval.search.local import _sort_key
+    from moonpark.search.local import _sort_key
 
     p = client.get("/site?mock=1&local_search=1").json()
     assert p["data_source"] == "mock"

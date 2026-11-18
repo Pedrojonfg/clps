@@ -41,7 +41,7 @@ La máscara depende del sitio, no de la fecha. Ocupa 2,9 KB; lo caro es calcular
 ## Cosas que conviene saber antes de que te las saquen (no en el pitch)
 
 - **El ajuste de β no pasó su propio gate.** La banda 2–40 % de inversiones se fijó antes (D-7c70); con β = 0,15 salió 0,94 % / 0,00 % → REOPEN. β = 0,25 se eligió después con varianza y solapamiento top-k (D-48ee, T-d567:63). Respuesta honesta: «el gate dijo que el bonus apenas cambiaba el orden; cambié de métrica y lo dejé documentado».
-- **El tope de 0,40 nunca actúa.** Con β = 0,25 y B ≤ 1 la subida máxima es 25 % (`lunar_eval/score.py:12-13,105-109`). Es una barandilla por si β cambia, no un efecto real.
+- **El tope de 0,40 nunca actúa.** Con β = 0,25 y B ≤ 1 la subida máxima es 25 % (`moonpark/score.py:12-13,105-109`). Es una barandilla por si β cambia, no un efecto real.
 - **PSR no fuerza el cero.** `psr_precheck` avisa, pero `score()` no mira `in_psr` (D-bf69 lo plantea como precheck).
 - **Deep search ignora los hazards** (`api/app.py` ~327) y va marcada `provisional`.
 - **La búsqueda local solo desplaza el tiempo** en producción (`neighbour_sites = []`, `planner_payload.py:136`).

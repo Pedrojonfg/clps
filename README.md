@@ -1,6 +1,6 @@
-# lunar-eval: landing site × time evaluator for the lunar south pole
+# Moonpark: landing site × time evaluator for the lunar south pole
 
-lunar-eval answers one question for a lunar south-pole mission: **if I land
+Moonpark answers one question for a lunar south-pole mission: **if I land
 here, on these dates, will I have enough sunlight and enough line of sight to
 Earth?**
 
@@ -16,7 +16,7 @@ It is a solo portfolio project. The NASA Space Apps Challenge 2026 brief
 inspired the problem. It is not a contest submission, and it is not
 affiliated with or endorsed by NASA.
 
-**Browser demo:** [pedrojonfg.github.io/clps](https://pedrojonfg.github.io/clps/).
+**Browser demo:** [pedrojonfg.github.io/moonpark](https://pedrojonfg.github.io/moonpark/).
 It runs the desktop interface in the browser with **mocked data only**: one
 sample result, whatever the inputs. See [Limitations](#limitations).
 
@@ -77,7 +77,7 @@ SPICE kernels ──► Sun / Earth az-el ────────────�
 Diviner climatology + slope ──► hazards ─────────────────┘
 ```
 
-- **Engine:** Python package `lunar_eval/` (NumPy, SciPy, rasterio, SpiceyPy).
+- **Engine:** Python package `moonpark/` (NumPy, SciPy, rasterio, SpiceyPy).
 - **API:** FastAPI (`api/`). The desktop app and the browser pages call it
   over HTTP.
 - **Precomputed masks:** `scripts/precompute.py` builds masks over the polar
@@ -148,7 +148,7 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
 from the GitHub Releases page. The app starts its own engine and downloads the
 data it needs on first use, so nothing else has to be running.
 
-**In the browser (no install):** [pedrojonfg.github.io/clps](https://pedrojonfg.github.io/clps/).
+**In the browser (no install):** [pedrojonfg.github.io/moonpark](https://pedrojonfg.github.io/moonpark/).
 There is no server behind it. Every run returns the same mocked sample result,
 so it shows the interface and the flow, not real terrain analysis.
 
@@ -161,7 +161,7 @@ python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pytest
-uvicorn api.app:app --reload   # serves on http://127.0.0.1:8000
+uvicorn moonpark.api.app:app --reload   # serves on http://127.0.0.1:8000
 ```
 
 **2. Desktop app** (in another terminal, with the API running)
@@ -217,7 +217,7 @@ run `localStorage.setItem('cesium_ion_token', '<token>')` and reload.
 ## Repo layout
 
 ```
-lunar_eval/   engine: ephemeris, horizon masks, visibility, score, search, hazards
+moonpark/   engine: ephemeris, horizon masks, visibility, score, search, hazards
 api/          FastAPI server
 desktop/      desktop app (Tauri + React + Blueprint)
 web/          standalone browser pages (planner, region map, first-person)

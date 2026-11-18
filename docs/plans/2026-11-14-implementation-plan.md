@@ -66,7 +66,7 @@ Planning round: ran inside this document (solo; complexity gate fired on unclear
 | P3 | **Visibility series** per hour: `sun_fraction`, `earth_fraction` in [0, 1]; flags from the user's fraction thresholds; longest night; longest lit period with bridged shadows (`D-f369`) | Team-lock | pj (gate) | Engine, Search, Viz |
 | P4 | **Score contract** `score(series, hazards, needs) → {score, feasible, breakdown, provenance}`; formula from the pj session | Team-lock, own content | pj (15:00) | Engine, Search, Viz |
 | P5 | **Provider seam** (`D-b8d3`): `Body`, `EphemerisProvider`, `HorizonProvider`, `SurfaceHazardProvider`; Moon only | Team-lock | pj (gate) | all engine code |
-| P6 | **Stack**: package `lunar_eval`, FastAPI, static web page; `pyproject.toml` owned by Ops | Team-lock (advise) | pj (gate) | all lanes |
+| P6 | **Stack**: package `moonpark`, FastAPI, static web page; `pyproject.toml` owned by Ops | Team-lock (advise) | pj (gate) | all lanes |
 | P7 | **Fixtures and data**: Horizons tables under `tests/fixtures/horizons/` (fetched once, app User-Agent); DEMs and masks in `data/` (ignored), never in git | Team-lock | pj (gate) | Sky, Terrain, Ops |
 | P8 | **Sunday target** = full scope, fallback cut order §12 | own | pj — `D-20261114-pj-a3b3` | everything |
 | P9 | **Demo site** and its refinement | own (`D-f369` deferred value) | pj, Sat ~20:00 | Terrain, slides |
@@ -82,13 +82,13 @@ Hours are lane hours; pj review is ~30% on top.
 
 | ID | Scope | Lane | Hours | Confidence | Critical path | Reads / writes | Depends on | Done looks like |
 |---|---|---|---|---|---|---|---|---|
-| S1 | Sky at a site | Sky | 3 | partial | yes | `lunar_eval/ephemeris/`, tests, fixtures | P1, P7, Spike K | Hourly Sun/Earth az/el for any site; Horizons fixture test passes at pj's tolerance |
-| S2 | Horizon masks + 1 km cap | Terrain | 4 + overnight | partial | yes | `lunar_eval/horizon/`, `scripts/precompute.py`, tests | P2, downloads | `D-f369` schedule; 28-point tolerance test ≤ 5 h; cap stored |
-| S3 | Visibility timeline | Engine | 2 | known | yes | `lunar_eval/visibility.py`, tests | P1–P3 | Fractions, four cases, longest night, bridged lit periods; matches the prototype numbers |
-| S4 | Needs-adapted score | Engine | 3 | partial | yes | `lunar_eval/score.py`, tests | P4, S3 | pj's hand scenarios pass; infeasible → 0 naming the failing minimum |
-| S5 | Layer-B surface factors | Hazards | 6 | unknown | yes (Sunday) | `lunar_eval/hazards/` | P5, P13 | Temperature and dust terms per site×time with provenance, consumed by the score |
-| S6 | Local search | Search | 3 | unknown | no | `lunar_eval/search/local.py` | S4 | Nearest feasible time; better neighbours within ±N km; or an honest "none" |
-| S7 | Deep search over ranges | Search | 6 | unknown | no | `lunar_eval/search/deep.py` | S6, P14 | Best site×time over user ranges with the stated stopping rule and its runtime |
+| S1 | Sky at a site | Sky | 3 | partial | yes | `moonpark/ephemeris/`, tests, fixtures | P1, P7, Spike K | Hourly Sun/Earth az/el for any site; Horizons fixture test passes at pj's tolerance |
+| S2 | Horizon masks + 1 km cap | Terrain | 4 + overnight | partial | yes | `moonpark/horizon/`, `scripts/precompute.py`, tests | P2, downloads | `D-f369` schedule; 28-point tolerance test ≤ 5 h; cap stored |
+| S3 | Visibility timeline | Engine | 2 | known | yes | `moonpark/visibility.py`, tests | P1–P3 | Fractions, four cases, longest night, bridged lit periods; matches the prototype numbers |
+| S4 | Needs-adapted score | Engine | 3 | partial | yes | `moonpark/score.py`, tests | P4, S3 | pj's hand scenarios pass; infeasible → 0 naming the failing minimum |
+| S5 | Layer-B surface factors | Hazards | 6 | unknown | yes (Sunday) | `moonpark/hazards/` | P5, P13 | Temperature and dust terms per site×time with provenance, consumed by the score |
+| S6 | Local search | Search | 3 | unknown | no | `moonpark/search/local.py` | S4 | Nearest feasible time; better neighbours within ±N km; or an honest "none" |
+| S7 | Deep search over ranges | Search | 6 | unknown | no | `moonpark/search/deep.py` | S6, P14 | Best site×time over user ranges with the stated stopping rule and its runtime |
 | S8 | Horizon chart | Viz | 3 | partial | yes | `web/horizon.*`, `api/routes/site.py` | P1–P3 (mock first) | Mask silhouette, Sun and Earth tracks, case strip, thresholds |
 | S9 | Region score map | Viz | 4 | partial | no | `web/map.*`, `api/routes/region.py` | S2 cap, S4 | Score heatmap over 80–90°S at 1 km; click a cell → chart; deep-search result highlighted |
 | S10 | First-person view | Viz-3D | 4 | partial | no | `web/firstperson.*` | P11, S1, S2 | Terrain from the site with the Sun and Earth placed from our geometry at the chosen hour |
@@ -116,9 +116,9 @@ Hours are lane hours; pj review is ~30% on top.
 
 **Phase 0 — Sat 14:30–18:00, parallel. Exit: one site end-to-end on real data; P1–P7 honoured; P4, P10, P11, P13 decided.**
 
-- Ops: all DEM downloads; repo skeleton (`pyproject.toml`, `lunar_eval/`, `api/`, `web/`, `tests/`, `.gitignore` for `data/`), CI with `pytest`; order the CX43.
+- Ops: all DEM downloads; repo skeleton (`pyproject.toml`, `moonpark/`, `api/`, `web/`, `tests/`, `.gitignore` for `data/`), CI with `pytest`; order the CX43.
 - Sky: Spike K, then S1.
-- Terrain: port `/tmp/masktest.py`, `/tmp/restest2.py`, `/tmp/illum*.py` into `lunar_eval/horizon/` with the tolerance test; tiled reader.
+- Terrain: port `/tmp/masktest.py`, `/tmp/restest2.py`, `/tmp/illum*.py` into `moonpark/horizon/` with the tolerance test; tiled reader.
 - Engine: S3 on synthetic inputs.
 - Viz: S8 on a mock.
 - pj: 15:00–16:00 score session (P4); 16:30 ephemeris library from Spike K; 17:00–17:45 layer-B session (P13); 17:45 basemap and viewer calls (P10, P11).
@@ -167,11 +167,11 @@ Imbalance check: Search carries the most uncertain work (S7); it is first in the
 
 | Area | Owner | Others may |
 |---|---|---|
-| `lunar_eval/ephemeris/` | Sky | import |
-| `lunar_eval/horizon/`, `scripts/precompute.py` | Terrain | import |
-| `lunar_eval/visibility.py`, `score.py` | Engine | import |
-| `lunar_eval/hazards/` | Hazards | import |
-| `lunar_eval/search/` | Search | — |
+| `moonpark/ephemeris/` | Sky | import |
+| `moonpark/horizon/`, `scripts/precompute.py` | Terrain | import |
+| `moonpark/visibility.py`, `score.py` | Engine | import |
+| `moonpark/hazards/` | Hazards | import |
+| `moonpark/search/` | Search | — |
 | `api/`, route list, `web/` (except `firstperson.*`) | Viz | Engine adds fields only through P1–P4 |
 | `web/firstperson.*` | Viz-3D | — |
 | `pyproject.toml`, CI, `.gitignore`, `deploy/` | Ops | request changes in one small merge |

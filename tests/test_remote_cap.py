@@ -10,7 +10,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 import pytest
 
-from lunar_eval.horizon.remote import RemoteCap
+from moonpark.horizon.remote import RemoteCap
 
 
 @pytest.fixture()
@@ -55,7 +55,7 @@ def test_unknown_file(store, tmp_path):
 def test_unreachable_store_fails_fast_and_is_not_retried_immediately(tmp_path, monkeypatch):
     import time
 
-    from lunar_eval.horizon import remote
+    from moonpark.horizon import remote
 
     calls = []
 

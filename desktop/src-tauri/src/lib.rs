@@ -18,7 +18,7 @@ fn api_base(engine: State<Engine>) -> String {
 }
 
 fn start_engine(app: &tauri::AppHandle) -> Engine {
-    let exe = if cfg!(windows) { "lunar-eval-api.exe" } else { "lunar-eval-api" };
+    let exe = if cfg!(windows) { "moonpark-api.exe" } else { "moonpark-api" };
     let Ok(resources) = app.path().resource_dir() else {
         return Engine { port: None, child: Mutex::new(None) };
     };

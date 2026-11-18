@@ -44,7 +44,7 @@ jobs:
         run: deploy/build-desktop.sh
       - name: Smoke-test the bundled engine
         run: |
-          exe=desktop/src-tauri/engine/lunar-eval-api
+          exe=desktop/src-tauri/engine/moonpark-api
           [ -f "$exe.exe" ] && exe="$exe.exe"
           "$exe" --port 8765 &
           pid=$!
@@ -53,7 +53,7 @@ jobs:
           kill $pid || true
       - uses: actions/upload-artifact@v4
         with:
-          name: lunar-eval-${{ matrix.name }}
+          name: moonpark-${{ matrix.name }}
           path: |
             desktop/src-tauri/target/release/bundle/**/*.deb
             desktop/src-tauri/target/release/bundle/**/*.AppImage

@@ -1,4 +1,4 @@
-# lunar-eval vX.Y.Z
+# moonpark vX.Y.Z
 
 Landing-site × time evaluator for the lunar south pole. Desktop app with the engine bundled: nothing else to install or start.
 
@@ -6,15 +6,15 @@ Landing-site × time evaluator for the lunar south pole. Desktop app with the en
 
 | System | File | Notes |
 |--------|------|-------|
-| Windows 10/11 (64-bit) | `lunar-eval_X.Y.Z_x64-setup.exe` or `lunar-eval_X.Y.Z_x64_en-US.msi` | Unsigned, see below |
-| macOS (Apple Silicon) | `lunar-eval_X.Y.Z_aarch64.dmg` | Unsigned, see below. Intel Macs are not built yet |
-| Linux | `lunar-eval_X.Y.Z_amd64.AppImage`, `.deb` or `.rpm` | |
+| Windows 10/11 (64-bit) | `moonpark_X.Y.Z_x64-setup.exe` or `moonpark_X.Y.Z_x64_en-US.msi` | Unsigned, see below |
+| macOS (Apple Silicon) | `moonpark_X.Y.Z_aarch64.dmg` | Unsigned, see below. Intel Macs are not built yet |
+| Linux | `moonpark_X.Y.Z_amd64.AppImage`, `.deb` or `.rpm` | |
 
 Or from a package manager:
 
 ```bash
-winget install Pedrojonfg.LunarEval       # Windows (once accepted)
-brew install --cask Pedrojonfg/clps/lunar-eval   # macOS
+winget install Pedrojonfg.Moonpark       # Windows (once accepted)
+brew install --cask Pedrojonfg/moonpark/moonpark   # macOS
 ```
 
 ## First launch
@@ -25,14 +25,14 @@ The app is **not code-signed** (a certificate costs money this project does not 
 
 **macOS.** The first time, macOS may say the app "is damaged" or "cannot be opened". Either:
 - right-click the app in *Applications*, choose *Open*, then *Open* again; or
-- in a terminal: `xattr -cr /Applications/lunar-eval.app`
+- in a terminal: `xattr -cr /Applications/moonpark.app`
 
 Installing with the Homebrew command above removes the flag for you.
 
 **Linux.**
-- AppImage: `chmod +x lunar-eval_*.AppImage && ./lunar-eval_*.AppImage`
-- Debian/Ubuntu: `sudo apt install ./lunar-eval_*_amd64.deb`
-- Fedora: `sudo dnf install ./lunar-eval-*.rpm`
+- AppImage: `chmod +x moonpark_*.AppImage && ./moonpark_*.AppImage`
+- Debian/Ubuntu: `sudo apt install ./moonpark_*_amd64.deb`
+- Fedora: `sudo dnf install ./moonpark-*.rpm`
 
 ## First analysis downloads data
 

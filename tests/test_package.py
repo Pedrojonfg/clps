@@ -1,5 +1,5 @@
-from lunar_eval import __version__
-from lunar_eval.providers import MOON, HorizonMask, Site
+from moonpark import __version__
+from moonpark.providers import MOON, HorizonMask, Site
 
 
 def test_version():

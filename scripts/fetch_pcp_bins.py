@@ -83,7 +83,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dest", type=Path, required=True)
     parser.add_argument("--base", type=str, required=True)
-    parser.add_argument("--ua", type=str, default="lunar-eval/0.1")
+    parser.add_argument("--ua", type=str, default="moonpark/0.1")
     parser.add_argument("--season", choices=["summer", "winter", "both"], default="both")
     parser.add_argument("--bins", type=str, default="", help="Comma 1-based bins; empty=all 1..96")
     parser.add_argument("--jobs", type=int, default=4, help="Parallel downloads")

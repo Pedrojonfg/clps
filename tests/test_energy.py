@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lunar_eval.energy import EnergyParams, incidence_cos, params_from_needs, soc_series
-from lunar_eval.score import score
+from moonpark.energy import EnergyParams, incidence_cos, params_from_needs, soc_series
+from moonpark.score import score
 
 TEN_MIN_H = 10 / 60
 

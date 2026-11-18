@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from api.app import app
+from moonpark.api.app import app
 
 # Same rows as DEMO_ROWS in web/map.js (the region map's "Load demo").
 DEMO_ROWS = [

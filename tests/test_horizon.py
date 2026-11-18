@@ -1,4 +1,4 @@
-"""Contract tests for lunar_eval.horizon (D-20261114-pj-f369, D-9e53).
+"""Contract tests for moonpark.horizon (D-20261114-pj-f369, D-9e53).
 
 polar_stereo_xy must match the south-polar formula in /tmp/masktest.py.
 mask() has no sampler seam yet, so default tests cover xy, shape and
@@ -13,8 +13,8 @@ import math
 import numpy as np
 import pytest
 
-from lunar_eval.horizon import Grid, mask, polar_stereo_xy
-from lunar_eval.providers import Site
+from moonpark.horizon import Grid, mask, polar_stereo_xy
+from moonpark.providers import Site
 
 R_M = 1_737_400.0  # 1737.4e3 m
 
