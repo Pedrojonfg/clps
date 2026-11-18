@@ -203,9 +203,14 @@ python scripts/precompute.py  # 1 km mask cap (overnight)
 With them on disk the engine uses them instead of downloading. Deep
 search becomes available once the mask cap is on disk.
 
-**3D view token:** create a free token at
-[cesium.com/ion](https://cesium.com/ion/tokens), then in the app's dev console
-run `localStorage.setItem('cesium_ion_token', '<token>')` and reload.
+**3D view:** the first-person view meshes the ground from the same LOLA DEMs the
+horizon mask uses (the API's `/terrain` endpoint), so it needs no token and no
+account. It is untextured: relief reads through our Sun direction only. For the
+textured, higher-resolution Cesium Moon instead, create a free token at
+[cesium.com/ion](https://cesium.com/ion/tokens), add
+[Cesium Moon Terrain](https://ion.cesium.com/assetdepot/2684829) to your assets,
+save the token in the view's "Add ion token" panel and choose "Use Cesium ion".
+The ion tileset is also the automatic fallback when a site has no DEM on disk.
 
 ## What's next
 
