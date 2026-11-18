@@ -37,6 +37,15 @@ sample result, whatever the inputs. See [Limitations](#limitations).
   set typical thresholds, for example VIPER-style hibernation, an Artemis III
   surface stay, Blue Ghost-class or direct-to-Earth priority. You can also set
   every threshold by hand.
+- **Battery balance (optional).** Give the battery capacity, the array power
+  and the load in darkness (in W, or as hours of autonomy) and the score
+  simulates the state of charge hour by hour. A site fails when the battery
+  drops below the reserve, and the risk uses the margin to that reserve instead
+  of the longest-night term. Without those inputs everything works as before.
+  Defaults such as the 10 % reserve are provisional.
+- **Time resolution.** Metrics are in hours at any sample spacing. The planner
+  defaults to 10-minute steps; 1 h is the coarse option. A further requirement,
+  *total light in the window*, is available next to the continuous-light one.
 - **Surface hazards.** Optional hazard checks add surface temperature, from
   Diviner polar climatology by local solar time and season, and a slope-based
   soil-resistance ("dust") proxy.
@@ -103,7 +112,7 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
   request needs, checks a sha256, caches it under the user cache directory
   (`LUNAR_CACHE` to change it) and works offline afterwards.
   `LUNAR_STORE_URL=off` disables the download. Elevation models (~11 GB) are
-  only needed to regenerate masks, never on a client. Without data the app
+  only needed to regenerate masks, never on a client. Until the data set is published to the store, or with no network, the app
   falls back to **mock mode**, labelled as mocked. `scripts/publish_masks.py`
   uploads a new data set.
 - **Without DEMs a site snaps to its 1 km cell.** A client machine has no
@@ -115,8 +124,10 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
 - **The desktop app bundles its engine.** `deploy/build-desktop.sh` packs the
   Python evaluator as a Tauri sidecar that the app starts and stops itself, on
   a loopback port. Installers are built once per operating system. In
-  development you can still run `deploy/run-local.sh`.
-  There is no packaged installer yet.
+  development you can still run `deploy/run-local.sh` (API with auto-reload
+  plus the UI dev server). A GitHub Actions workflow
+  (`.github/workflows/desktop-release.yml`) builds the installers for Linux,
+  Windows and macOS. They are not published as a release yet.
 - **The 3D view needs a Cesium ion token** (free account) whose account has
   *Cesium Moon Terrain* (asset 2684829) added from the ion Asset Depot.
   Without both you get the 2D panorama.
@@ -132,6 +143,10 @@ Details and how to run each check: [`docs/validation.md`](docs/validation.md).
   only the lunar south polar cap is built and tested.
 
 ## Try it
+
+**Installed app (when a release exists):** download the installer for your OS
+from the GitHub Releases page. The app starts its own engine and downloads the
+data it needs on first use, so nothing else has to be running.
 
 **In the browser (no install):** [pedrojonfg.github.io/clps](https://pedrojonfg.github.io/clps/).
 There is no server behind it. Every run returns the same mocked sample result,
@@ -185,8 +200,9 @@ run `localStorage.setItem('cesium_ion_token', '<token>')` and reload.
 
 ## What's next
 
-- **Desktop release:** installable builds with the Python engine bundled, so
-  you don't need to start a server by hand.
+- **Desktop release:** the installers build in CI; what is left is uploading
+  the data to the store, launching the packaged app on each OS and publishing
+  the first release.
 - **Finer masks over the whole cap:** move from 1 km to 100 m spacing over
   the full south polar cap.
 - **Browser demo with real data:** the browser demo is still mocked; the
