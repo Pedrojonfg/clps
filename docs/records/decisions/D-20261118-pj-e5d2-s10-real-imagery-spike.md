@@ -43,3 +43,21 @@ Go criteria: no obvious baked shadows at the site, brightness controllable by `D
 
 - If go: per-vertex albedo in `/terrain`, an imagery file in the store, provenance and credit updated.
 - If no-go: this record closes the question until better imagery is available.
+
+## Outcome of the spike (2026-11-18)
+
+Downloaded `WAC_ROI_SOUTH_SUMMER_100M.TIF` (829 MB, 8-bit, 28786 px square, 100 m/px, polar stereographic in the same planar metres as our DEMs). It lines up with our DEM (the large crater and the small craters coincide in a Site01 window), and sampling it needs no reprojection.
+
+**No-go for draping it directly near the pole.** Even this mosaic, chosen by LROC to minimise shadows, is mostly photographed shadow at our sites:
+
+| Window | Pixels below 20 / 255 | Median |
+|---|---|---|
+| Site01, 3 km | 58 % | 5 |
+| Site01, 15 km | 47 % | 36 |
+| (-89.52, 205), 3 km | 98 % | 2 |
+| (-89.48, 248), 3 km | 94 % | 1 |
+| 85°S and 82°S, 3 km | 11 % | 72 to 87 |
+
+Draped as colour, the photo's own shadows would sit on the mesh and contradict our Sun-disc series (`D-7304`); near the pole most of the ground would be black with no information to recover. It is usable at about 82°S to 85°S, which is not where the sites are.
+
+Kept: procedural surface (`D-c3a9`). Options left open, none started: (a) use the photo only where lit and blend to procedural elsewhere (patchwork tied to the photo's Sun); (b) invert the photo's illumination against our DEM to recover albedo (research-grade, shadow pixels still empty); (c) ion for recordings. The file stays in `data/imagery/` (gitignored) for any later test.
