@@ -1,0 +1,9 @@
+PackageIdentifier: Pedrojonfg.LunarEval
+PackageVersion: X.Y.Z
+InstallerType: nullsoft   # the NSIS setup.exe; use `wix` if you publish the .msi instead
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/Pedrojonfg/clps/releases/download/vX.Y.Z/lunar-eval_X.Y.Z_x64-setup.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.6.0
