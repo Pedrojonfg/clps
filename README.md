@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/moonpark-mark-dark.svg">
+    <img src="branding/moonpark-mark.svg" alt="Moonpark logo" width="96">
+  </picture>
+</p>
+
 # Moonpark: landing site × time evaluator for the lunar south pole
 
 Moonpark answers one question for a lunar south-pole mission: **if I land
