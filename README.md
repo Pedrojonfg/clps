@@ -102,10 +102,9 @@ The project only claims what has been checked:
 | Check | Status |
 |-------|--------|
 | SPICE Sun/Earth azimuth and elevation match saved JPL Horizons tables | Automated test (`pytest`) |
-| Longest night and longest lit period within 5 h of a 5 m-resolution reference, on a 28-point set | Automated test (`pytest`) |
 | Score is 0 when a mission limit is missed, and above 0 when all are met | Automated test (`pytest`) |
-| Short-night re-check on long-night sites | Script ready, not run yet |
-| Comparison with NASA PGDA average-illumination maps | Script ready, not run yet |
+| Short-night re-check on long-night sites | Not implemented yet |
+| Comparison with NASA PGDA average-illumination maps | Not implemented yet |
 
 Details and how to run each check: [`docs/validation.md`](docs/validation.md).
 
