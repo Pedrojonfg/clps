@@ -6,7 +6,7 @@ Landing-site × time evaluator for the lunar south pole. Desktop app with the en
 
 | System | File | Notes |
 |--------|------|-------|
-| Windows 10/11 (64-bit) | `lunar-eval_X.Y.Z_x64-setup.exe` or `.msi` | Unsigned, see below |
+| Windows 10/11 (64-bit) | `lunar-eval_X.Y.Z_x64-setup.exe` or `lunar-eval_X.Y.Z_x64_en-US.msi` | Unsigned, see below |
 | macOS (Apple Silicon) | `lunar-eval_X.Y.Z_aarch64.dmg` | Unsigned, see below. Intel Macs are not built yet |
 | Linux | `lunar-eval_X.Y.Z_amd64.AppImage`, `.deb` or `.rpm` | |
 
