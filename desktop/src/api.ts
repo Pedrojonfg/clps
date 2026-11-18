@@ -105,11 +105,12 @@ export async function fetchSite(form: PlannerForm): Promise<SitePayload> {
 }
 
 /** Same-origin URLs via Vite proxy — localStorage ion token is shared with the iframe. */
-export function firstPersonUrl(form: PlannerForm, mode2d = false): string {
+export function firstPersonUrl(form: PlannerForm, mode2d = false, preferIon = false): string {
   const p = new URLSearchParams(buildSiteQuery(form));
   if (STATIC_DEMO) p.set("static", "1");
   if (API_BASE) p.set("api", API_BASE);
   if (mode2d) p.set("mode", "2d");
+  if (preferIon) p.set("terrain", "ion");
   return `${BASE}firstperson.html?${p.toString()}`;
 }
 

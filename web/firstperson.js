@@ -5,11 +5,15 @@
  * 2026-11-16: D-26d2 playback + follow, D-7304 brightness follows our Sun-disc fraction,
  * D-08e8 Earth-link indicator (chips, compass strip, time strip), D-ce2e max backdrop quality,
  * D-b43a mask azimuth convention.
+ * 2026-11-18: default backdrop is our own LOLA relief from the API's /terrain (no token);
+ * the Cesium ion Moon tileset stays as an opt-in (?terrain=ion) and as the fallback when
+ * the API has no DEM for the site.
  */
 
 (function () {
   const OBSERVER_HEIGHT_M = 2; // per D-f2d3
   const CESIUM_MOON_ION_ASSET = 2684829; // per D-7d58
+  const FAR_RING_M = 250000; // outer edge of the own-relief mesh: where our mask's DEM schedule ends
   const OVERLAY_DISTANCE_M = 20000; // our mask/sky are directions; drawn on a far shell, never depth-hidden
   const SUN = "#c9a227";
   const EARTH = "#6a8faa";
@@ -756,9 +760,158 @@
     }
   }
 
-  async function tryCesium(token) {
+  /** Our own relief for the site: the API computes it from the LOLA DEMs (static demo: demo/terrain.json). */
+  async function fetchTerrain(lat, lon, params) {
+    try {
+      const isStatic = params.get("static") === "1";
+      const url = isStatic ? "demo/terrain.json" : `${API_BASE}/terrain?lat=${lat}&lon=${lon}`;
+      const res = await fetch(url);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = body.detail?.message || body.detail?.error || res.statusText;
+        return { data: null, why: `Our relief is not available for this site (${msg}).` };
+      }
+      return { data: body, why: "" };
+    } catch (e) {
+      return { data: null, why: `Our relief could not be loaded (${e.message}).` };
+    }
+  }
+
+  /**
+   * Mesh the ring-grid relief (radii × azimuths, heights above the site's tangent plane) in the
+   * observer's east-north-up frame and add it to the scene. Returns an object with setUniform so
+   * the Sun-fraction brightness (D-7304) drives it the same way as the ion tileset's shader.
+   */
+  function addTerrainMesh(viewer, terrain, enu) {
     const Cesium = window.Cesium;
-    Cesium.Ion.defaultAccessToken = token;
+    // Beyond the meshed 30 km the ground continues out to the horizon our mask already knows, so
+    // one far ring follows the mask elevation: no black gap between the mesh and the mask line.
+    // A centre point under the observer closes the hole inside the innermost ring (looking straight down).
+    const radii = [0, ...terrain.radii_m, FAR_RING_M];
+    const nr = radii.length;
+    const naz = terrain.naz;
+    const raw = atob(terrain.heights_f32_b64);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    const h0 = new Float32Array(bytes.buffer);
+    const h = new Float32Array(nr * naz); // ring 0 is the centre point; the last ring is overwritten by farZ
+    h.set(h0, naz);
+    let centre = 0;
+    for (let j = 0; j < naz; j++) centre += h0[j] / naz;
+    h.fill(centre, 0, naz);
+    const farZ = (j) => FAR_RING_M * Math.tan((maskAt((j * 360) / naz) * Math.PI) / 180);
+
+    const pos = new Float64Array(nr * naz * 3);
+    for (let i = 0; i < nr; i++) {
+      for (let j = 0; j < naz; j++) {
+        const az = (j * 2 * Math.PI) / naz;
+        const k = (i * naz + j) * 3;
+        pos[k] = radii[i] * Math.sin(az); // east
+        pos[k + 1] = radii[i] * Math.cos(az); // north
+        // the frame sits at the eye; the mask angle is already measured from it
+        pos[k + 2] = i === nr - 1 ? farZ(j) : h[i * naz + j] - OBSERVER_HEIGHT_M;
+      }
+    }
+    const idx = new Uint32Array((nr - 1) * naz * 6);
+    let m = 0;
+    for (let i = 0; i < nr - 1; i++) {
+      for (let j = 0; j < naz; j++) {
+        const a = i * naz + j;
+        const b = i * naz + ((j + 1) % naz);
+        const c = (i + 1) * naz + j;
+        const d = (i + 1) * naz + ((j + 1) % naz);
+        idx[m++] = a; idx[m++] = b; idx[m++] = c;
+        idx[m++] = b; idx[m++] = d; idx[m++] = c;
+      }
+    }
+    const st = new Float32Array(nr * naz * 2); // east/north metres: the procedural surface below keys on them
+    for (let v = 0; v < nr * naz; v++) {
+      st[v * 2] = pos[v * 3];
+      st[v * 2 + 1] = pos[v * 3 + 1];
+    }
+    const nrm = new Float32Array(pos.length);
+    for (let t = 0; t < idx.length; t += 3) {
+      const ia = idx[t] * 3, ib = idx[t + 1] * 3, ic = idx[t + 2] * 3;
+      const ux = pos[ib] - pos[ia], uy = pos[ib + 1] - pos[ia + 1], uz = pos[ib + 2] - pos[ia + 2];
+      const vx = pos[ic] - pos[ia], vy = pos[ic + 1] - pos[ia + 1], vz = pos[ic + 2] - pos[ia + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      for (const k of [ia, ib, ic]) { nrm[k] += nx; nrm[k + 1] += ny; nrm[k + 2] += nz; }
+    }
+    for (let k = 0; k < nrm.length; k += 3) {
+      const l = Math.hypot(nrm[k], nrm[k + 1], nrm[k + 2]) || 1;
+      nrm[k] /= l; nrm[k + 1] /= l; nrm[k + 2] /= l;
+    }
+
+    const geometry = new Cesium.Geometry({
+      attributes: {
+        position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: pos }),
+        normal: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 3, values: nrm }),
+        st: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 2, values: st }),
+      },
+      indices: idx,
+      primitiveType: Cesium.PrimitiveType.TRIANGLES,
+      boundingSphere: Cesium.BoundingSphere.fromVertices(Array.from(pos)),
+    });
+    // Procedural regolith: we have no albedo imagery, so tone and grain are synthetic (and labelled
+    // so). Grain is a screen-space bump on the normal, which the grazing Sun turns into texture;
+    // it fades with distance so it never shimmers.
+    const material = new Cesium.Material({
+      fabric: {
+        uniforms: { u_sun: 1.0 },
+        source: `
+          float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+          float vnoise(vec2 p) {
+            vec2 i = floor(p), f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+          }
+          float fbm(vec2 p) {
+            float a = 0.5, s = 0.0;
+            for (int k = 0; k < 4; k++) { s += a * vnoise(p); p *= 2.03; a *= 0.5; }
+            return s;
+          }
+          czm_material czm_getMaterial(czm_materialInput materialInput) {
+            czm_material material = czm_getDefaultMaterial(materialInput);
+            vec2 p = materialInput.st;
+            vec3 pe = materialInput.positionToEyeEC;
+            float dist = length(pe);
+            float near = 1.0 - smoothstep(60.0, 700.0, dist);
+
+            // Micro-relief in metres (hummocks and pits), faded with distance.
+            float h = ((fbm(p / 0.9) - 0.5) * 0.6 + (fbm(p / 7.0) - 0.5) * 2.5) * near;
+            vec3 n = normalize(materialInput.normalEC);
+            vec3 dpdx = dFdx(pe), dpdy = dFdy(pe);
+            vec3 r1 = cross(dpdy, n), r2 = cross(n, dpdx);
+            float det = dot(dpdx, r1);
+            vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+            material.normal = normalize(abs(det) * n - grad);
+
+            // Tone: slow patches of brighter and darker regolith plus a little grain.
+            float tone = 0.72 + 0.55 * fbm(p / 60.0) + 0.18 * (fbm(p / 2.5) - 0.5) * near;
+            vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0), u_sun);
+            material.diffuse = vec3(0.31, 0.30, 0.285) * tone * tint * u_sun;
+            material.specular = 0.0;
+            return material;
+          }
+        `,
+      },
+    });
+    viewer.scene.primitives.add(
+      new Cesium.Primitive({
+        geometryInstances: new Cesium.GeometryInstance({ geometry }),
+        appearance: new Cesium.MaterialAppearance({ material, materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED, translucent: false, closed: false }),
+        modelMatrix: enu,
+        asynchronous: false,
+        compressVertices: false,
+        allowPicking: false,
+      }),
+    );
+    return { setUniform: (name, v) => { material.uniforms[name] = v; } };
+  }
+
+  async function tryCesium(source, token, terrain) {
+    const Cesium = window.Cesium;
+    if (source === "ion") Cesium.Ion.defaultAccessToken = token;
     if ("default" in Cesium.Ellipsoid) Cesium.Ellipsoid.default = Cesium.Ellipsoid.MOON; // per D-7d58
 
     const container = $("cesiumContainer");
@@ -792,39 +945,43 @@
       if (viewer.scene.sun) viewer.scene.sun.show = false;
       if (viewer.scene.moon) viewer.scene.moon.show = false;
 
-      const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CESIUM_MOON_ION_ASSET, {
-        enableCollision: true,
-        // per D-ce2e: fine level of detail everywhere in view (no foveation), from a 2 m eye
-        maximumScreenSpaceError: 2,
-        dynamicScreenSpaceError: false,
-        foveatedScreenSpaceError: false,
-        skipLevelOfDetail: false,
-        cacheBytes: 1024 * 1024 * 1024,
-        maximumCacheOverflowBytes: 512 * 1024 * 1024,
-      });
-      // Polar imagery has its shadows baked in and reads almost black from 2 m; lift the albedo
-      // a little so the backdrop is legible, then scale by our Sun-disc fraction (D-7304), with a
-      // slightly cool tint toward night. Visual context only (D-671e) — not a photometric model.
-      const shader = new Cesium.CustomShader({
-        uniforms: {
-          u_gain: { type: Cesium.UniformType.FLOAT, value: 1.35 },
-          u_sun: { type: Cesium.UniformType.FLOAT, value: 1.0 },
-        },
-        fragmentShaderText: `
-          void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
-            vec3 lifted = clamp(pow(material.diffuse, vec3(0.75)) * u_gain + 0.03, 0.0, 1.0);
-            vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0), u_sun);
-            material.diffuse = lifted * tint * u_sun;
-          }
-        `,
-      });
-      tileset.customShader = shader;
-      viewer.scene.primitives.add(tileset);
+      let tileset = null;
+      let shader = null;
+      if (source === "ion") {
+        tileset = await Cesium.Cesium3DTileset.fromIonAssetId(CESIUM_MOON_ION_ASSET, {
+          enableCollision: true,
+          // per D-ce2e: fine level of detail everywhere in view (no foveation), from a 2 m eye
+          maximumScreenSpaceError: 2,
+          dynamicScreenSpaceError: false,
+          foveatedScreenSpaceError: false,
+          skipLevelOfDetail: false,
+          cacheBytes: 1024 * 1024 * 1024,
+          maximumCacheOverflowBytes: 512 * 1024 * 1024,
+        });
+        // Polar imagery has its shadows baked in and reads almost black from 2 m; lift the albedo
+        // a little so the backdrop is legible, then scale by our Sun-disc fraction (D-7304), with a
+        // slightly cool tint toward night. Visual context only (D-671e) — not a photometric model.
+        shader = new Cesium.CustomShader({
+          uniforms: {
+            u_gain: { type: Cesium.UniformType.FLOAT, value: 1.35 },
+            u_sun: { type: Cesium.UniformType.FLOAT, value: 1.0 },
+          },
+          fragmentShaderText: `
+            void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+              vec3 lifted = clamp(pow(material.diffuse, vec3(0.75)) * u_gain + 0.03, 0.0, 1.0);
+              vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0), u_sun);
+              material.diffuse = lifted * tint * u_sun;
+            }
+          `,
+        });
+        tileset.customShader = shader;
+        viewer.scene.primitives.add(tileset);
+      }
       state.viewer = viewer;
 
       const lat = Number(state.data.mask?.lat ?? state.lat);
       const lon = Number(state.data.mask?.lon ?? state.lon);
-      const ground = await terrainHeight(viewer, lon, lat);
+      const ground = source === "own" ? terrain.ground_m : await terrainHeight(viewer, lon, lat);
       const origin = Cesium.Cartesian3.fromDegrees(lon, lat, (ground ?? 0) + OBSERVER_HEIGHT_M, Cesium.Ellipsoid.MOON);
       state.cesium = {
         origin,
@@ -832,6 +989,14 @@
         shader,
         enu: Cesium.Transforms.eastNorthUpToFixedFrame(origin, Cesium.Ellipsoid.MOON),
       };
+      if (source === "own") {
+        // No ion data is in view, so swap the "Cesium ion" logo for a plain, accurate credit.
+        container.classList.add("own-credit");
+        viewer.creditDisplay.addStaticCredit(
+          new Cesium.Credit('Rendered with <a href="https://cesium.com/platform/cesiumjs/" target="_blank" rel="noreferrer">CesiumJS</a> · relief: NASA LRO / LOLA', true),
+        );
+        state.cesium.shader = addTerrainMesh(viewer, terrain, state.cesium.enu);
+      }
       if (ground === null) {
         showNotice(["Terrain height at the site could not be sampled; the eye point sits 2 m above the reference sphere, so it may float or clip."]);
       }
@@ -847,8 +1012,18 @@
       else if (n0 && n0.earthLink) face(n0.earthAz, 4);
       else applyLook();
 
-      $("mode-tag").textContent = "Cesium Moon backdrop + our mask & sky";
-      $("provenance-oneliner").textContent = "Backdrop: Cesium Moon — not our model"; // per D-671e
+      if (source === "own") {
+        $("mode-tag").textContent = "Our LOLA relief + our mask & sky";
+        $("provenance-oneliner").textContent = "Backdrop: our LOLA DEM relief, procedural surface"; // per D-671e
+        $("prov-backdrop").innerHTML =
+          "<strong>Ours (relief):</strong> the ground is meshed from the same LOLA elevation models the horizon mask comes from (" +
+          terrain.dem.join(", ") +
+          "), finest under the observer and coarser with distance, out to 30 km, and from there the ground simply follows our horizon mask. Its colour and grain are procedural, not imagery (we hold no albedo data), so it is visual context only: the mask, not the mesh, is what is scored.";
+        $("prov-attrib").innerHTML = "<strong>Attribution:</strong> NASA LRO / LOLA (PGDA).";
+      } else {
+        $("mode-tag").textContent = "Cesium Moon backdrop + our mask & sky";
+        $("provenance-oneliner").textContent = "Backdrop: Cesium Moon — not our model"; // per D-671e
+      }
       $("look-readout").hidden = false;
       $("compass").hidden = false;
       $("follow-wrap").hidden = false;
@@ -867,7 +1042,7 @@
       state.viewer = null;
       state.cesium = null;
       container.hidden = true;
-      showNotice(["Cesium could not start the Moon backdrop (" + (e?.message || e) + "). Showing the 2D mask panorama."]);
+      showNotice(["The 3D backdrop could not start (" + (e?.message || e) + ")."]);
       return false;
     }
   }
@@ -1028,20 +1203,36 @@
     state.t = skyIndexForStart(state.data, params);
     setupChrome(state.data, params);
 
-    // per D-7d58 / D-ac74: no token, no ion asset or a failed start → 2D panorama
+    // Backdrop order: our own LOLA relief (no token) → Cesium ion Moon with a token → 2D panorama.
+    // ?terrain=ion asks for the ion tileset first; it is also the fallback when the API has no DEM.
     const token = getIonToken(params);
+    const preferIon = params.get("terrain") === "ion";
     let ok = false;
     if (params.get("mode") === "2d") {
-      // The user chose the light 2D view (slow GPU, no token): never start Cesium.
-      showNotice(["2D view selected. Use “Switch to 3D” above for the Moon backdrop."]);
-    } else if (!token) {
-      showNotice(["No Cesium ion token saved, so there is no 3D backdrop. Showing the 2D mask panorama."]);
+      // The user chose the light 2D view (slow GPU): never start Cesium.
+      showNotice(["2D view selected. Use “Switch to 3D” above for the 3D backdrop."]);
     } else if (!window.Cesium) {
       showNotice(["CesiumJS could not be loaded (offline?). Showing the 2D mask panorama."]);
     } else {
-      const probe = await probeIon(token);
-      if (probe === "ok") ok = await tryCesium(token);
-      else showNotice(ION_NOTICES[probe]);
+      const tryIon = async () => {
+        const probe = await probeIon(token);
+        if (probe === "ok") return tryCesium("ion", token, null);
+        showNotice(ION_NOTICES[probe]);
+        return false;
+      };
+      if (preferIon && token) ok = await tryIon();
+      if (!ok && !(preferIon && token)) {
+        const lat = Number(state.data.mask?.lat ?? state.lat);
+        const lon = Number(state.data.mask?.lon ?? state.lon);
+        const terrain = await fetchTerrain(lat, lon, params);
+        if (terrain.data) ok = await tryCesium("own", "", terrain.data);
+        else if (token) {
+          showNotice([terrain.why + " Trying the Cesium ion Moon instead."]);
+          ok = await tryIon();
+        } else {
+          showNotice([terrain.why + " Add a Cesium ion token for a 3D backdrop meanwhile; showing the 2D mask panorama."]);
+        }
+      }
     }
     if (!ok) showFallback();
   }

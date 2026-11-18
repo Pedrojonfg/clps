@@ -223,6 +223,17 @@ def mission_templates() -> dict:
     return {"templates": list_templates()}
 
 
+@app.get("/terrain")
+def terrain(lat: float = Query(...), lon: float = Query(...)) -> dict:
+    """Ring-mesh relief from our own DEMs for the first-person view; 503 when no DEM covers the site."""
+    from moonpark.terrain import TerrainUnavailable, rings_for
+
+    try:
+        return rings_for(lat, lon)
+    except TerrainUnavailable as e:
+        raise HTTPException(status_code=503, detail={"error": "terrain_unavailable", "message": str(e)})
+
+
 @app.get("/site")
 def site(
     mock: int = Query(0, description="1 = CI mock only"),

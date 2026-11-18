@@ -140,6 +140,9 @@
         touch-action: none;
       }
 
+      #cesiumContainer.own-credit .cesium-credit-logoContainer {
+        display: none !important;
+      }
       #cesiumContainer.dragging {
         cursor: grabbing;
       }
@@ -348,12 +351,12 @@
         <div id="details" hidden>
           <ul>
             <li><strong>Ours:</strong> the horizon mask line and the Sun and Earth positions for this site and time — the same series the planner scores.</li>
-            <li><strong>Not ours:</strong> Cesium Moon terrain and imagery (Cesium ion asset 2684829; NASA / USGS sources via Cesium). Visual context only: it is not the mask and not the score.</li>
+            <li id="prov-backdrop"><strong>Not ours:</strong> Cesium Moon terrain and imagery (Cesium ion asset 2684829; NASA / USGS sources via Cesium). Visual context only: it is not the mask and not the score.</li>
             <li><strong>Brightness:</strong> the backdrop is scaled by our visible Sun-disc fraction (the series the planner scores), down to a dim floor at night. It is lit from our Sun azimuth at a fixed angle so relief reads. No shadows are cast; it is not an illumination model.</li>
             <li><strong>Earth link:</strong> line of sight to the Earth above our horizon mask, by the planner's Earth threshold — not a radio link budget.</li>
             <li><strong>Playback:</strong> positions between the hourly samples are interpolated; only the hourly samples are scored.</li>
             <li><strong>Observer:</strong> 2 m above the surface, look-around only.</li>
-            <li><strong>Attribution:</strong> Cesium ion, NASA, USGS as shown in the on-view credits.</li>
+            <li id="prov-attrib"><strong>Attribution:</strong> Cesium ion, NASA, USGS as shown in the on-view credits.</li>
           </ul>
         </div>
       </div>
