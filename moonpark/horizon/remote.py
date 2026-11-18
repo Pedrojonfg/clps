@@ -149,7 +149,7 @@ def ensure_file(rel: str, dest_root: Path, base: str, manifest: dict) -> Path:
     _progress_start(rel, entry["size"])
     try:
         with _get(f"{base}/{rel}") as r, part.open("wb") as out:
-            while chunk := r.read(1 << 20):
+            while chunk := r.read(1 << 16):  # 64 KiB: a 1 MiB read stalls progress for seconds on a slow link
                 out.write(chunk)
                 _progress_add(len(chunk))
         if _sha256(part) != entry["sha256"]:
