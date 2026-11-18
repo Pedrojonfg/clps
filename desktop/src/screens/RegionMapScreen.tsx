@@ -57,7 +57,7 @@ export function RegionMapScreen({ form, onOpenSite }: Props) {
     function onMessage(ev: MessageEvent) {
       if (ev.origin !== window.location.origin) return;
       const m = ev.data as { type?: string; target?: string; lat?: number; lon?: number };
-      if (m?.type !== "lunar-eval:open-site" || typeof m.lat !== "number" || typeof m.lon !== "number") return;
+      if (m?.type !== "moonpark:open-site" || typeof m.lat !== "number" || typeof m.lon !== "number") return;
       onOpenSite(m.lat, m.lon, m.target === "firstperson" ? "firstperson" : "planner");
     }
     window.addEventListener("message", onMessage);

@@ -3,14 +3,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lunar_eval.hazards.fill import fill_nodata_quadrant_idw
-from lunar_eval.hazards.lst import lst_bin_index, local_solar_time_h_from_utc
-from lunar_eval.hazards.moon import MoonHazards, aggregate_hazards
-from lunar_eval.hazards.pcp import PolarPcpClimatology
-from lunar_eval.hazards.soil import soil_resistance
-from lunar_eval.hazards.temperature import ClimatologyTable
-from lunar_eval.providers import Site
-from lunar_eval.score import score
+from moonpark.hazards.fill import fill_nodata_quadrant_idw
+from moonpark.hazards.lst import lst_bin_index, local_solar_time_h_from_utc
+from moonpark.hazards.moon import MoonHazards, aggregate_hazards
+from moonpark.hazards.pcp import PolarPcpClimatology
+from moonpark.hazards.soil import soil_resistance
+from moonpark.hazards.temperature import ClimatologyTable
+from moonpark.providers import Site
+from moonpark.score import score
 
 
 def test_quadrant_idw_fills_centre_from_neighbors() -> None:
@@ -86,8 +86,8 @@ def test_local_solar_time_shifts_with_longitude() -> None:
 
 def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
     # Synthetic summer ltim01 around lon=0, lat=-89 (normalized stereo).
-    from lunar_eval.horizon import polar_stereo_xy
-    from lunar_eval.horizon.mask import R_M
+    from moonpark.horizon import polar_stereo_xy
+    from moonpark.horizon.mask import R_M
 
     x_m, y_m = polar_stereo_xy(-89.0, 0.0)
     xn, yn = x_m / R_M, y_m / R_M
@@ -107,7 +107,7 @@ def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
     assert meta["product"].startswith("urn:nasa:pds:lro_diviner_derived1")
 
 def test_spread_k_is_spatial_only() -> None:
-    from lunar_eval.hazards.pcp import R_M, _BinCache, spread_k
+    from moonpark.hazards.pcp import R_M, _BinCache, spread_k
 
     n = 100
     step = 240.0 / R_M

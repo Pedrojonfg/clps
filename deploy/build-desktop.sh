@@ -17,13 +17,13 @@ esac
 
 ENGINE=desktop/src-tauri/engine
 rm -rf "$ENGINE" build/engine
-"$VENV/$BIN/pyinstaller" --noconfirm --onedir --name lunar-eval-api \
+"$VENV/$BIN/pyinstaller" --noconfirm --onedir --name moonpark-api \
   --distpath build/engine --workpath build/engine-work --specpath build/engine-work \
   --paths . --add-data "$(pwd -W 2>/dev/null || pwd)/web${SEP}web" \
-  --collect-submodules uvicorn --collect-submodules lunar_eval --collect-submodules api \
+  --collect-submodules uvicorn --collect-submodules moonpark \
   --collect-all rasterio --collect-all spiceypy --collect-all pyarrow \
-  api/sidecar.py
-mv build/engine/lunar-eval-api "$ENGINE"
+  moonpark/api/sidecar.py
+mv build/engine/moonpark-api "$ENGINE"
 touch "$ENGINE/.gitkeep"
 
 (cd desktop && npm ci && npm run tauri build)

@@ -1,6 +1,6 @@
 import type { PlannerForm, SavedAnalysis, SitePayload } from "../types";
 
-const STORAGE_KEY = "lunar_eval_analyses_v1";
+const STORAGE_KEY = "moonpark_analyses_v1";
 const MAX_SAVED = 40;
 
 export function loadAnalyses(): SavedAnalysis[] {

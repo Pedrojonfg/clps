@@ -3,7 +3,7 @@
 set -euo pipefail
 DEST="$(cd "$(dirname "$0")/.." && pwd)/data/kernels"
 mkdir -p "$DEST"
-UA="lunar-eval/0.1 (+https://github.com/Pedrojonfg/clps)"
+UA="moonpark/0.1 (+https://github.com/Pedrojonfg/moonpark)"
 BASE="https://naif.jpl.nasa.gov/pub/naif/generic_kernels"
 fetch() { echo "==> $2"; curl -L --fail --retry 5 --retry-all-errors -A "$UA" -C - -o "$DEST/$2" "$1"; }
 fetch "$BASE/lsk/naif0012.tls" naif0012.tls

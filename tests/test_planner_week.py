@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from api.app import app
-from lunar_eval.site01 import real_data_available
+from moonpark.api.app import app
+from moonpark.site01 import real_data_available
 
 client = TestClient(app)
 

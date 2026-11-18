@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lunar_eval.planner_payload import build_planner_payload
-from lunar_eval.providers import Site
-from lunar_eval.search.local import local_search
-from lunar_eval.site01 import SITE01, real_data_available
+from moonpark.planner_payload import build_planner_payload
+from moonpark.providers import Site
+from moonpark.search.local import local_search
+from moonpark.site01 import SITE01, real_data_available
 
 pytestmark = pytest.mark.skipif(not real_data_available(), reason="Site01 DEM or kernels not present")
 

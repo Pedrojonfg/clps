@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lunar_eval.horizon import load_tif, mask, polar_stereo_xy
-from lunar_eval.providers import Site
+from moonpark.horizon import load_tif, mask, polar_stereo_xy
+from moonpark.providers import Site
 
 _REPO = Path(__file__).resolve().parents[1]
 _SITE5 = _REPO / "data" / "dem" / "Site01_final_adj_5mpp_surf.tif"
@@ -67,9 +67,9 @@ def test_site01_sky_mask_series_score_end_to_end() -> None:
     pytest.importorskip("spiceypy")
     from horizons_parse import parse_horizons_azel
 
-    from lunar_eval.ephemeris import SpiceEphemeris
-    from lunar_eval.score import score
-    from lunar_eval.visibility import series
+    from moonpark.ephemeris import SpiceEphemeris
+    from moonpark.score import score
+    from moonpark.visibility import series
 
     rows = parse_horizons_azel(_FIXTURE)[:8]
     times = np.array([row.time_utc for row in rows], dtype="datetime64[s]")

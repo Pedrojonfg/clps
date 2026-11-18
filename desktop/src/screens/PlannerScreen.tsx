@@ -169,8 +169,8 @@ export function PlannerScreen({
   const demoCallout = STATIC_DEMO && (
     <Callout intent="warning" title="Browser demo: mocked data" style={{ marginBottom: 8 }}>
       There is no server behind this page. Every run returns the same sample result, so changing the inputs
-      does not change it. For computed results, run lunar-eval locally with the data —{" "}
-      <a href="https://github.com/Pedrojonfg/clps#try-it" target="_blank" rel="noreferrer">
+      does not change it. For computed results, run moonpark locally with the data —{" "}
+      <a href="https://github.com/Pedrojonfg/moonpark#try-it" target="_blank" rel="noreferrer">
         see the README
       </a>
       .
@@ -195,7 +195,7 @@ export function PlannerScreen({
           {error}
           <div className={Classes.TEXT_MUTED} style={{ marginTop: 8 }}>
             Start the API:{" "}
-            <code>cd ~/clps && PYTHONPATH=. python3 -m uvicorn api.app:app --port 8000</code>
+            <code>cd ~/moonpark && PYTHONPATH=. python3 -m uvicorn moonpark.api.app:app --port 8000</code>
           </div>
         </Callout>
       )}

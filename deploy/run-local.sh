@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$HOME/.nvm/nvm.sh" 2>/dev/null || true
-uvicorn api.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir api --reload-dir lunar_eval &
+uvicorn moonpark.api.app:app --host 127.0.0.1 --port 8000 --reload --reload-dir moonpark &
 API=$!
 trap 'kill $API 2>/dev/null' EXIT
 cd desktop

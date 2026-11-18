@@ -22,9 +22,9 @@ import pyarrow.parquet as pq
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from lunar_eval.horizon import load_tif, mask, polar_stereo_xy  # noqa: E402
-from lunar_eval.horizon.mask import R_M, SCHEDULE_VERSION  # noqa: E402
-from lunar_eval.providers import Site  # noqa: E402
+from moonpark.horizon import load_tif, mask, polar_stereo_xy  # noqa: E402
+from moonpark.horizon.mask import R_M, SCHEDULE_VERSION  # noqa: E402
+from moonpark.providers import Site  # noqa: E402
 
 DEM = REPO / "data" / "dem"
 OUT = REPO / "data" / "masks" / "cap_1km"

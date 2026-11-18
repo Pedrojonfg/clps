@@ -11,24 +11,42 @@ type Props = {
 export function FirstPersonScreen({ form }: Props) {
   const [tokenDraft, setTokenDraft] = useState(() => loadIonToken());
   const [savedToken, setSavedToken] = useState(() => loadIonToken());
-  const [tokenOpen, setTokenOpen] = useState(() => !loadIonToken());
+  const [tokenOpen, setTokenOpen] = useState(false); // the token is optional now: our own relief needs none
   const [iframeKey, setIframeKey] = useState(0);
 
   // Light 2D panorama on request (slow GPU / no token). Remembered per machine.
   const [mode2d, setMode2d] = useState(() => {
     try {
-      return localStorage.getItem("clps:firstPerson2d") === "1";
+      return localStorage.getItem("moonpark:firstPerson2d") === "1";
     } catch {
       return false;
     }
   });
-  const src = useMemo(() => firstPersonUrl(form, mode2d), [form, iframeKey, mode2d]);
+  // Cesium ion Moon instead of our own LOLA relief; needs a token. Remembered per machine.
+  const [preferIon, setPreferIon] = useState(() => {
+    try {
+      return localStorage.getItem("moonpark:firstPersonIon") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const src = useMemo(() => firstPersonUrl(form, mode2d, preferIon && !!savedToken), [form, iframeKey, mode2d, preferIon, savedToken]);
+
+  function toggleIon() {
+    const next = !preferIon;
+    setPreferIon(next);
+    try {
+      localStorage.setItem("moonpark:firstPersonIon", next ? "1" : "0");
+    } catch {
+      /* not remembered */
+    }
+  }
 
   function toggleMode() {
     const next = !mode2d;
     setMode2d(next);
     try {
-      localStorage.setItem("clps:firstPerson2d", next ? "1" : "0");
+      localStorage.setItem("moonpark:firstPerson2d", next ? "1" : "0");
     } catch {
       /* private mode: the choice just isn't remembered */
     }
@@ -50,8 +68,20 @@ export function FirstPersonScreen({ form }: Props) {
         </span>
         <span style={{ flex: 1 }} />
         <Tag minimal intent={savedToken ? "success" : "warning"}>
-          {savedToken ? "Cesium ion token saved" : "No Cesium ion token"}
+          {savedToken ? "Cesium ion token saved (optional)" : "No Cesium ion token (optional)"}
         </Tag>
+        {savedToken && (
+          <Button
+            small
+            minimal
+            icon="globe"
+            intent={preferIon ? "primary" : "none"}
+            onClick={toggleIon}
+            title={preferIon ? "Back to our own LOLA relief" : "Use the Cesium ion Moon terrain (textured, higher resolution) instead of our own relief"}
+          >
+            {preferIon ? "Use our relief" : "Use Cesium ion"}
+          </Button>
+        )}
         <Button
           small
           minimal
@@ -60,7 +90,7 @@ export function FirstPersonScreen({ form }: Props) {
           aria-expanded={tokenOpen}
           onClick={() => setTokenOpen((o) => !o)}
         >
-          {savedToken ? "Change token" : "Add token"}
+          {savedToken ? "Change ion token" : "Add ion token"}
         </Button>
         <Button
           small
@@ -68,7 +98,7 @@ export function FirstPersonScreen({ form }: Props) {
           icon={mode2d ? "cube" : "heat-grid"}
           intent={mode2d ? "primary" : "none"}
           onClick={toggleMode}
-          title={mode2d ? "Load the 3D Moon backdrop (needs a GPU and a Cesium ion token)" : "Use the light 2D horizon panorama instead of the 3D view"}
+           title={mode2d ? "Load the 3D view (needs a GPU)" : "Use the light 2D horizon panorama instead of the 3D view"}
         >
           {mode2d ? "Switch to 3D" : "Use 2D view"}
         </Button>
@@ -99,7 +129,8 @@ export function FirstPersonScreen({ form }: Props) {
             </ControlGroup>
           </form>
           <span>
-            The 3D backdrop needs a free Cesium ion account: 1) create a token at{" "}
+            Optional. The 3D view uses our own LOLA relief and needs no token. For the textured, higher-resolution
+            Cesium Moon instead, or as a stand-in while the API has no DEM for a site, use a free Cesium ion account: 1) create a token at{" "}
             <a href="https://ion.cesium.com/tokens" target="_blank" rel="noreferrer">
               ion.cesium.com/tokens
             </a>
@@ -108,7 +139,7 @@ export function FirstPersonScreen({ form }: Props) {
               Cesium Moon Terrain (asset 2684829)
             </a>{" "}
             to “My Assets” — a token alone cannot load it; 3) paste the token here. It is kept only in
-            this machine's localStorage. Without it the view falls back to the 2D mask panorama.
+            this machine's localStorage, then choose “Use Cesium ion”.
           </span>
         </div>
       </Collapse>

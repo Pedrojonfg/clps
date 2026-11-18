@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lunar_eval.planner_payload import parse_time_window
-from lunar_eval.providers import HorizonMask, SkySample
-from lunar_eval.score import score
-from lunar_eval.visibility import longest_lit_h, longest_night_h, series
+from moonpark.planner_payload import parse_time_window
+from moonpark.providers import HorizonMask, SkySample
+from moonpark.score import score
+from moonpark.visibility import longest_lit_h, longest_night_h, series
 
 TEN_MIN_H = 10 / 60
 

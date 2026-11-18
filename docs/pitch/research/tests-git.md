@@ -69,7 +69,7 @@ S1 to S15 were built in roughly 22 working hours (11-14 15:50 to 11-15 13:19), a
 - docs: +7,326/−876
 - web: +1,373/−20
 - scripts: +1,058
-- lunar_eval misc (planner, providers, visibility, site01, region_map): +769
+- moonpark misc (planner, providers, visibility, site01, region_map): +769
 - hazards: +511/−16
 - api: +455/−43
 - search: +379/−5

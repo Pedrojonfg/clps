@@ -28,7 +28,7 @@ Paths are relative to /home/pedrojon/clps. CS = docs/sources/challenge-statement
 - Inputs:
   - lat/lon (default is PGDA Site01, -89.463, 222.510)
   - UTC start/end and step in hours (default is a 24 h window, so set 7 days for a "week planner")
-  - a mission template with 10 presets: Blue Ghost, VIPER, Artemis III stay, DTE priority, long-night survival, and others (`lunar_eval/planner_templates.py`)
+  - a mission template with 10 presets: Blue Ghost, VIPER, Artemis III stay, DTE priority, long-night survival, and others (`moonpark/planner_templates.py`)
   - thresholds: max night, max no-Earth, min continuous lit, Sun/Earth lit %, shadow bridge
   - toggles: require-both, Layer-B hazards, local search
 - Outputs:

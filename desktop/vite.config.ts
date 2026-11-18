@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
 // Where the local API listens; override to run a second dev stack beside the default one.
-const api = process.env.LUNAR_EVAL_API ?? "http://127.0.0.1:8000";
+const api = process.env.MOONPARK_API ?? "http://127.0.0.1:8000";
 
 // https://vite.dev/config/
 export default defineConfig(() => ({

@@ -10,10 +10,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lunar_eval.horizon import polar_stereo_xy
-from lunar_eval.providers import Site
-from lunar_eval.score import score
-from lunar_eval.search.local import DEFAULT_RADIUS_KM, local_search, window_slide_starts
+from moonpark.horizon import polar_stereo_xy
+from moonpark.providers import Site
+from moonpark.score import score
+from moonpark.search.local import DEFAULT_RADIUS_KM, local_search, window_slide_starts
 
 NEEDS = {"max_night_h": 50, "max_no_earth_h": 20, "require_both": False}
 RADIUS_KM = 5.0  # per D-72bc local_neighbour_radius_km=5

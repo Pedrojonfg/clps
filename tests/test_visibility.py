@@ -1,11 +1,11 @@
-"""Contract tests for lunar_eval.visibility (D-20261114-pj-9e53, D-f369)."""
+"""Contract tests for moonpark.visibility (D-20261114-pj-9e53, D-f369)."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from lunar_eval.visibility import longest_lit_h, longest_night_h, sun_fraction
+from moonpark.visibility import longest_lit_h, longest_night_h, sun_fraction
 
 RS = 0.2665
 
@@ -46,8 +46,8 @@ def test_longest_lit_h(fraction: np.ndarray, bridge_h: int, expected: int) -> No
 
 def test_series_exposes_hour_counts_consistent_with_fractions() -> None:
     """D-7520: hours_*_above_threshold = count(fraction > threshold) over the series."""
-    from lunar_eval.providers import HorizonMask, SkySample
-    from lunar_eval.visibility import series
+    from moonpark.providers import HorizonMask, SkySample
+    from moonpark.visibility import series
 
     elevation = np.full(720, 10.0, dtype=np.float32)
     horizon = HorizonMask(

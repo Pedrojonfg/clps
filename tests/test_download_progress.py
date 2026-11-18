@@ -9,8 +9,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from api.app import app
-from lunar_eval.horizon import remote
+from moonpark.api.app import app
+from moonpark.horizon import remote
 
 
 def _serve(tmp: Path, payload: bytes):

@@ -2,7 +2,7 @@
 
 ## 1. Pipeline end to end
 
-1. **Ephemeris.** `SpiceEphemeris.sky` (`lunar_eval/ephemeris/spice.py:52`) loads DE440s and the Moon kernels (:14). Each hour it calls `spkcpo` (:68-69, LT+S correction, `MOON_ME` frame) and converts to local ENU (`_azel` :42). Output: Sun/Earth az/el and disk radius. Tests check it against JPL Horizons fixtures (0.05° working bound, `tests/test_ephemeris.py:28`).
+1. **Ephemeris.** `SpiceEphemeris.sky` (`moonpark/ephemeris/spice.py:52`) loads DE440s and the Moon kernels (:14). Each hour it calls `spkcpo` (:68-69, LT+S correction, `MOON_ME` frame) and converts to local ENU (`_azel` :42). Output: Sun/Earth az/el and disk radius. Tests check it against JPL Horizons fixtures (0.05° working bound, `tests/test_ephemeris.py:28`).
 2. **Horizon masks.** `mask()` (`horizon/mask.py:20`) casts 720 rays over LOLA DEM bands picked by `mask_schedule_for_site` (`horizon/dem_schedule.py:14`). `mask_for_site` (`mask_store.py:70`) caches them. `scripts/precompute.py:main` (:143) builds the 1 km cap offline; `cap_index.py` serves it (:31, :88).
 3. **Visibility.** `series()` (`visibility.py:57`) maps azimuth into the mask frame (`_mask_el_at_geo_az` :22), computes visible disk fractions (`sun_fraction` :9), and derives longest night, longest no-Earth gap and longest lit stretch with gap bridging (:31, :40, :86).
 4. **Hazards.** `MoonHazards.hazards` (`hazards/moon.py:68`) combines a PSR flag (`LPSR_80S_20MPP`), slope (`LDSM_80S_80MPP`) feeding Metzger soil resistance (`soil.py:15`), and Diviner PCP temperature (`pcp.py:80`). `aggregate_hazards` (:95) keeps the worst case.
@@ -78,7 +78,7 @@
 | ephemeris/spice.py | 87 |
 | providers.py | 72 |
 | site01.py | 29 |
-| **lunar_eval total** | **~1,970** |
+| **moonpark total** | **~1,970** |
 | api/app.py | 394 |
 | scripts/precompute.py | 229 |
 | tests/ | 2,176 (more than the engine) |

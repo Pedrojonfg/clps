@@ -13,8 +13,8 @@ import math
 
 import pytest
 
-from lunar_eval.horizon import polar_stereo_xy
-from lunar_eval.region_map import (
+from moonpark.horizon import polar_stereo_xy
+from moonpark.region_map import (
     EVALUATED_OPACITY,
     INDUCE_RADIUS_KM,
     INDUCED_OPACITY,

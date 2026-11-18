@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from api.app import app
+from moonpark.api.app import app
 
 # Same rows as DEMO_ROWS in web/map.js (the region map's "Load demo").
 DEMO_ROWS = [
@@ -71,6 +71,16 @@ def main(out_dir: Path) -> None:
         res.raise_for_status()
         (out_dir / name).write_text(json.dumps(res.json()))
         print(f"wrote {out_dir / name}")
+
+    # Relief for the first-person view of the demo site; skipped where the DEMs are not on disk
+    # (CI), in which case the static page falls back to the 2D panorama.
+    demo = DEMO_ROWS[0]
+    terrain = client.get("/terrain", params={"lat": demo["lat_deg"], "lon": demo["lon_deg"]})
+    if terrain.status_code == 200:
+        (out_dir / "terrain.json").write_text(json.dumps(terrain.json()))
+        print(f"wrote {out_dir / 'terrain.json'}")
+    else:
+        print("no DEM on disk: skipped terrain.json")
 
 
 if __name__ == "__main__":

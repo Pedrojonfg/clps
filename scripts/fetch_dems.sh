@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="${ROOT}/data/dem"
 mkdir -p "$DEST"
-UA="lunar-eval/0.1 (+https://github.com/Pedrojonfg/clps)"
+UA="moonpark/0.1 (+https://github.com/Pedrojonfg/moonpark)"
 
 fetch() {
   local url="$1" name="$2"

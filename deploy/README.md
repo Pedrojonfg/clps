@@ -1,7 +1,7 @@
 # Browser demo on GitHub Pages
 
 The public demo is the **desktop interface built for the browser**, with mocked data and no server:
-https://pedrojonfg.github.io/clps/
+https://pedrojonfg.github.io/moonpark/
 
 ## How it works
 
@@ -20,7 +20,7 @@ npm ci --prefix desktop
 deploy/build-demo.sh        # output: desktop/dist
 ```
 
-Run the same commands to build locally. To preview with the same sub-path as Pages, serve a folder that contains `clps -> desktop/dist` and open `http://127.0.0.1:<port>/clps/`.
+Run the same commands to build locally. To preview with the same sub-path as Pages, serve a folder that contains `moonpark -> desktop/dist` and open `http://127.0.0.1:<port>/moonpark/`.
 
 Repo setting: **Settings → Pages → Source: GitHub Actions**.
 

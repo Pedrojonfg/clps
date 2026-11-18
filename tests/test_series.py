@@ -1,11 +1,11 @@
-"""S3 glue tests for lunar_eval.visibility.series."""
+"""S3 glue tests for moonpark.visibility.series."""
 
 from __future__ import annotations
 
 import numpy as np
 
-from lunar_eval.providers import HorizonMask, SkySample
-from lunar_eval.visibility import longest_lit_h, series, sun_fraction
+from moonpark.providers import HorizonMask, SkySample
+from moonpark.visibility import longest_lit_h, series, sun_fraction
 
 RS = 0.2665
 SCHEDULE = "test-hand-mask-v1"

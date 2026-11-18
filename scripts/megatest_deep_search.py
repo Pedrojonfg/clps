@@ -22,18 +22,18 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from lunar_eval.ephemeris import SpiceEphemeris  # noqa: E402
-from lunar_eval.horizon import polar_stereo_xy  # noqa: E402
-from lunar_eval.horizon.cap_index import (  # noqa: E402
+from moonpark.ephemeris import SpiceEphemeris  # noqa: E402
+from moonpark.horizon import polar_stereo_xy  # noqa: E402
+from moonpark.horizon.cap_index import (  # noqa: E402
     cap_index_available,
     mask_from_cap_tile,
     sites_in_xy_rect,
 )
-from lunar_eval.planner_payload import kernels_available  # noqa: E402
-from lunar_eval.planner_templates import TEMPLATES  # noqa: E402
-from lunar_eval.search.deep import DEFAULT_TMAX_S, deep_search  # noqa: E402
-from lunar_eval.site01 import SITE01  # noqa: E402
-from lunar_eval.visibility import series as vis_series  # noqa: E402
+from moonpark.planner_payload import kernels_available  # noqa: E402
+from moonpark.planner_templates import TEMPLATES  # noqa: E402
+from moonpark.search.deep import DEFAULT_TMAX_S, deep_search  # noqa: E402
+from moonpark.site01 import SITE01  # noqa: E402
+from moonpark.visibility import series as vis_series  # noqa: E402
 
 
 def main() -> int:

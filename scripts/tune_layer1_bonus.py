@@ -21,13 +21,13 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from lunar_eval.ephemeris import SpiceEphemeris  # noqa: E402
-from lunar_eval.horizon.mask_store import mask_for_site  # noqa: E402
-from lunar_eval.planner_payload import parse_time_window  # noqa: E402
-from lunar_eval.planner_templates import TEMPLATES  # noqa: E402
-from lunar_eval.score import score  # noqa: E402
-from lunar_eval.site01 import SITE01, real_data_available  # noqa: E402
-from lunar_eval.visibility import series  # noqa: E402
+from moonpark.ephemeris import SpiceEphemeris  # noqa: E402
+from moonpark.horizon.mask_store import mask_for_site  # noqa: E402
+from moonpark.planner_payload import parse_time_window  # noqa: E402
+from moonpark.planner_templates import TEMPLATES  # noqa: E402
+from moonpark.score import score  # noqa: E402
+from moonpark.site01 import SITE01, real_data_available  # noqa: E402
+from moonpark.visibility import series  # noqa: E402
 
 # per D-7c70
 _LOW_PCT = 2.0

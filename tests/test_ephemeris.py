@@ -17,8 +17,8 @@ import numpy as np
 import pytest
 
 from horizons_parse import HorizonsRow, parse_horizons_azel
-from lunar_eval.ephemeris import SpiceEphemeris
-from lunar_eval.providers import Site, SkySample
+from moonpark.ephemeris import SpiceEphemeris
+from moonpark.providers import Site, SkySample
 
 _REPO = Path(__file__).resolve().parents[1]
 _DE440 = _REPO / "data" / "kernels" / "de440s.bsp"

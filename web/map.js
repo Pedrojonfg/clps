@@ -8,7 +8,7 @@
  * four-quadrant inverse distance; it replaces drawing the API's four-neighbour induced copies.
  *
  * Everything that is data lives in south-polar stereographic metres (the cap grid of
- * lunar_eval.horizon.polar_stereo_xy), so 1 km cells stay square at the pole.
+ * moonpark.horizon.polar_stereo_xy), so 1 km cells stay square at the pole.
  */
 
 import * as THREE from "three";
@@ -291,7 +291,7 @@ function nearestSample(x, y, maxDist) {
   return best;
 }
 
-/** Same absolute ramp as lunar_eval.region_map.feasible_score_to_rgb (D-7227). */
+/** Same absolute ramp as moonpark.region_map.feasible_score_to_rgb (D-7227). */
 function scoreRgb(score) {
   const c = data.ceiling;
   const mid = c / 2;
@@ -858,7 +858,7 @@ async function loadDemo() {
 async function loadStoredSearch() {
   let raw = null;
   try {
-    raw = localStorage.getItem("clps:regionMapRequest");
+    raw = localStorage.getItem("moonpark:regionMapRequest");
   } catch (_) {
     /* storage blocked */
   }
@@ -890,7 +890,7 @@ function openSite(target) {
   if (EMBEDDED) {
     // The desktop shell owns navigation; never load another page inside its frame.
     window.parent.postMessage(
-      { type: "lunar-eval:open-site", target, lat: selected.lat_deg, lon: selected.lon_deg },
+      { type: "moonpark:open-site", target, lat: selected.lat_deg, lon: selected.lon_deg },
       location.origin,
     );
     return;
@@ -904,14 +904,14 @@ $("open-firstperson").addEventListener("click", () => openSite("firstperson"));
 $("load-demo").addEventListener("click", () => loadDemo());
 
 try {
-  $("evaluated-only").checked = localStorage.getItem("clps:mapEvaluatedOnly") === "1";
+  $("evaluated-only").checked = localStorage.getItem("moonpark:mapEvaluatedOnly") === "1";
 } catch (_) {
   /* storage blocked */
 }
 $("evaluated-only").addEventListener("change", () => {
   const only = evaluatedOnly();
   try {
-    localStorage.setItem("clps:mapEvaluatedOnly", only ? "1" : "0");
+    localStorage.setItem("moonpark:mapEvaluatedOnly", only ? "1" : "0");
   } catch (_) {
     /* storage blocked */
   }

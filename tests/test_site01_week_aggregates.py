@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from lunar_eval.planner_payload import build_planner_payload, parse_time_window
-from lunar_eval.site01 import SITE01, real_data_available
+from moonpark.planner_payload import build_planner_payload, parse_time_window
+from moonpark.site01 import SITE01, real_data_available
 
 REPO = Path(__file__).resolve().parents[1]
 GOLDEN = REPO / "tests" / "fixtures" / "site01_week_aggregates.json"
