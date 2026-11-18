@@ -7,27 +7,32 @@ use tauri::{Manager, RunEvent, State};
 /// The bundled Python engine (PyInstaller folder under resources/engine), started on a free
 /// loopback port when the app launches and stopped when it exits. # per D-8c03
 struct Engine {
+    inner: Mutex<EngineState>,
+}
+
+#[derive(Default)]
+struct EngineState {
     port: Option<u16>,
-    child: Mutex<Option<Child>>,
+    child: Option<Child>,
+    /// Why the engine could not be started (shown in the UI with a Retry button).
+    error: Option<String>,
 }
 
-/// Origin the UI should call; empty when no engine is bundled (`tauri dev` uses the Vite proxy).
-#[tauri::command]
-fn api_base(engine: State<Engine>) -> String {
-    engine.port.map(|p| format!("http://127.0.0.1:{p}")).unwrap_or_default()
-}
-
-fn start_engine(app: &tauri::AppHandle) -> Engine {
+fn start_engine(app: &tauri::AppHandle) -> EngineState {
+    let fail = |msg: String| {
+        eprintln!("{msg}");
+        EngineState { port: None, child: None, error: Some(msg) }
+    };
     let exe = if cfg!(windows) { "moonpark-api.exe" } else { "moonpark-api" };
     let Ok(resources) = app.path().resource_dir() else {
-        return Engine { port: None, child: Mutex::new(None) };
+        return EngineState::default();
     };
     let bin = resources.join("engine").join(exe);
     if !bin.is_file() {
-        return Engine { port: None, child: Mutex::new(None) };
+        return EngineState::default(); // no bundled engine (`tauri dev`): the Vite proxy serves the API
     }
     let Ok(listener) = TcpListener::bind("127.0.0.1:0") else {
-        return Engine { port: None, child: Mutex::new(None) };
+        return fail("no free local port for the engine".into());
     };
     let port = listener.local_addr().map(|a| a.port()).unwrap_or(0);
     drop(listener);
@@ -44,12 +49,46 @@ fn start_engine(app: &tauri::AppHandle) -> Engine {
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     match cmd.spawn() {
-        Ok(child) => Engine { port: Some(port), child: Mutex::new(Some(child)) },
-        Err(e) => {
-            eprintln!("could not start the engine: {e}");
-            Engine { port: None, child: Mutex::new(None) }
+        Ok(child) => EngineState { port: Some(port), child: Some(child), error: None },
+        Err(e) => fail(format!("could not start the engine ({}): {e}", bin.display())),
+    }
+}
+
+/// Origin the UI should call; empty when no engine is bundled (`tauri dev` uses the Vite proxy).
+#[tauri::command]
+fn api_base(engine: State<Engine>) -> String {
+    let st = engine.inner.lock().unwrap();
+    st.port.map(|p| format!("http://127.0.0.1:{p}")).unwrap_or_default()
+}
+
+/// Empty when the engine is fine (or not bundled); otherwise a short reason it is not running.
+#[tauri::command]
+fn engine_status(engine: State<Engine>) -> String {
+    let mut st = engine.inner.lock().unwrap();
+    if let Some(e) = &st.error {
+        return e.clone();
+    }
+    if let Some(child) = st.child.as_mut() {
+        if let Ok(Some(status)) = child.try_wait() {
+            let msg = format!("the engine exited unexpectedly ({status})");
+            st.child = None;
+            st.error = Some(msg.clone());
+            return msg;
         }
     }
+    String::new()
+}
+
+/// Retry: stop whatever is left of the engine and start a fresh one; returns its origin.
+#[tauri::command]
+fn restart_engine(app: tauri::AppHandle, engine: State<Engine>) -> String {
+    let mut st = engine.inner.lock().unwrap();
+    if let Some(mut child) = st.child.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    *st = start_engine(&app);
+    st.port.map(|p| format!("http://127.0.0.1:{p}")).unwrap_or_default()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -58,17 +97,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let engine = start_engine(app.handle());
-            app.manage(engine);
+            app.manage(Engine { inner: Mutex::new(engine) });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![api_base])
+        .invoke_handler(tauri::generate_handler![api_base, engine_status, restart_engine])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
             if let RunEvent::Exit = event {
                 if let Some(engine) = app.try_state::<Engine>() {
-                    if let Some(mut child) = engine.child.lock().unwrap().take() {
+                    if let Some(mut child) = engine.inner.lock().unwrap().child.take() {
                         let _ = child.kill();
+                        let _ = child.wait();
                     }
                 }
             }

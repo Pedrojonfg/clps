@@ -195,8 +195,7 @@ the region map.
 ```bash
 scripts/fetch_kernels.sh      # SPICE kernels
 scripts/fetch_dems.sh         # LOLA polar DEMs (~11 GB)
-scripts/fetch_hazards.sh      # hazard rasters
-python scripts/fetch_pcp_bins.py
+scripts/fetch_hazards.sh      # hazard rasters (also fetches the PCP diurnal bins)
 python scripts/precompute.py  # 1 km mask cap (overnight)
 ```
 

@@ -15,6 +15,7 @@ import threading
 import urllib.error
 import time
 import urllib.request
+import uuid
 from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -145,16 +146,19 @@ def ensure_file(rel: str, dest_root: Path, base: str, manifest: dict) -> Path:
     if dest.is_file() and dest.stat().st_size == entry["size"]:
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
-    part = dest.with_name(dest.name + ".part")
+    # A unique temp per call: concurrent downloads of the same rel never share (or delete)
+    # each other's in-flight file; whichever finishes last atomically replaces identical bytes.
+    # uuid + "xb" (not mkstemp) so the published file keeps umask permissions instead of 0600.
+    part = dest.with_name(f"{dest.name}.{uuid.uuid4().hex}.part")
     _progress_start(rel, entry["size"])
     try:
-        with _get(f"{base}/{rel}") as r, part.open("wb") as out:
+        with part.open("xb") as out, _get(f"{base}/{rel}") as r:
             while chunk := r.read(1 << 16):  # 64 KiB: a 1 MiB read stalls progress for seconds on a slow link
                 out.write(chunk)
                 _progress_add(len(chunk))
         if _sha256(part) != entry["sha256"]:
             raise OSError(f"checksum mismatch for {rel}")
-        part.replace(dest)
+        os.replace(part, dest)
         _progress_finish()
     finally:
         part.unlink(missing_ok=True)

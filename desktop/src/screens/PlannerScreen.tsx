@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { FormEvent, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   Button,
   Callout,
@@ -15,7 +15,7 @@ import {
   Tabs,
   Tag,
 } from "@blueprintjs/core";
-import { STATIC_DEMO, fetchProgress, fetchSite, fetchTemplates, type DownloadProgress } from "../api";
+import { STATIC_DEMO, buildSiteQuery, fetchProgress, fetchSite, fetchTemplates, type DownloadProgress } from "../api";
 
 const mb = (bytes: number) => (bytes / 1e6).toFixed(bytes >= 1e8 ? 0 : 1);
 import { LocalSearchBoard } from "../LocalSearchBoard";
@@ -49,6 +49,13 @@ export function PlannerScreen({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dl, setDl] = useState<DownloadProgress | null>(null);
+  // The inputs the displayed result was computed with; a result is only ever shown against these.
+  const [ranWith, setRanWith] = useState<PlannerForm | null>(data ? form : null);
+  const stale = Boolean(data && ranWith && buildSiteQuery(ranWith) !== buildSiteQuery(form));
+  // Latest request wins: older responses (aborted or late) are ignored.
+  const reqId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // While an analysis runs, ask the engine whether it is downloading data (first use, D-8c03).
   useEffect(() => {
@@ -80,29 +87,7 @@ export function PlannerScreen({
 
   useEffect(() => {
     if (!autoRun || data) return;
-    let cancelled = false;
-    (async () => {
-      setBusy(true);
-      setStatus("Computing…");
-      try {
-        const payload = await fetchSite(form);
-        if (cancelled) return;
-        setData(payload);
-        onSaved(form, payload);
-        setStatus("");
-        setTab("overview");
-        setView("results");
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
-        setStatus("");
-      } finally {
-        if (!cancelled) setBusy(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void compute(form);
   }, [autoRun]);
 
   function setField<K extends keyof PlannerForm>(key: K, value: PlannerForm[K]) {
@@ -130,25 +115,37 @@ export function PlannerScreen({
     }));
   }
 
-  async function runPlanner(ev?: FormEvent) {
-    ev?.preventDefault();
+  async function compute(f: PlannerForm) {
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    const id = ++reqId.current;
     setBusy(true);
     setError(null);
     setStatus("Computing…");
     try {
-      const payload = await fetchSite(form);
+      const payload = await fetchSite(f, ctl.signal);
+      if (id !== reqId.current) return;
       setData(payload);
-      onSaved(form, payload);
+      setRanWith(f);
+      onSaved(f, payload);
       setStatus("");
       setTab("overview");
       setView("results");
     } catch (e) {
+      if (id !== reqId.current || ctl.signal.aborted) return;
       setData(null);
+      setRanWith(null);
       setError(e instanceof Error ? e.message : String(e));
       setStatus("");
     } finally {
-      setBusy(false);
+      if (id === reqId.current) setBusy(false);
     }
+  }
+
+  function runPlanner(ev?: FormEvent) {
+    ev?.preventDefault();
+    void compute(form);
   }
 
   const sc = data?.score;
@@ -213,16 +210,20 @@ export function PlannerScreen({
       {error && (
         <Callout intent="danger" title="Planner error" style={{ marginBottom: 8 }}>
           {error}
-          <div className={Classes.TEXT_MUTED} style={{ marginTop: 8 }}>
-            Start the API:{" "}
-            <code>cd ~/moonpark && PYTHONPATH=. python3 -m uvicorn moonpark.api.app:app --port 8000</code>
-          </div>
+          {import.meta.env.DEV && !STATIC_DEMO && (
+            <div className={Classes.TEXT_MUTED} style={{ marginTop: 8 }}>
+              Development: start the API with{" "}
+              <code>PYTHONPATH=. python3 -m uvicorn moonpark.api.app:app --port 8000</code>
+            </div>
+          )}
         </Callout>
       )}
     </>
   );
 
   if (view === "results" && data) {
+    const used = ranWith ?? form;
+    const usedSummary = `${used.template_id || "custom"} · step ${used.step_min || "10"} min${energyOn(used) ? ` · battery ${used.battery_wh} Wh` : ` · night ≤ ${used.max_night_h} h`} · no-Earth ≤ ${used.max_no_earth_h} h${used.local_search ? " · best nearby start" : ""}${used.mock ? " · mock" : ""}`;
     return (
       <div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -236,7 +237,7 @@ export function PlannerScreen({
             Region map
           </Button>
           <span className={Classes.TEXT_MUTED} style={{ fontSize: 12 }}>
-            {form.lat}°, {form.lon}° · {form.start.replace("T", " ")} → {form.end.replace("T", " ")} UTC
+            {used.lat}°, {used.lon}° · {used.start.replace("T", " ")} → {used.end.replace("T", " ")} UTC · {usedSummary}
           </span>
           <span style={{ flex: 1 }} />
           {mock && (
@@ -245,6 +246,16 @@ export function PlannerScreen({
             </Tag>
           )}
         </div>
+        {stale && (
+          <Callout intent="warning" icon="warning-sign" title="Inputs changed — recalculate" style={{ marginBottom: 8 }}>
+            This result was computed with the parameters shown above, not the ones now in the form.
+            <div style={{ marginTop: 8 }}>
+              <Button intent="primary" icon="play" loading={busy} onClick={() => runPlanner()}>
+                Recalculate
+              </Button>
+            </div>
+          </Callout>
+        )}
         {messages}
         <Tabs id="planner-results" selectedTabId={tab} onChange={(id) => setTab(id as "overview" | "best")} renderActiveTabPanelOnly>
           <Tab id="overview" title="Overview" />
@@ -253,7 +264,7 @@ export function PlannerScreen({
             title={hasBoard ? `Best starts (${data.local_search!.leaderboard.length})` : "Best starts"}
           />
         </Tabs>
-        <div style={{ opacity: busy ? 0.5 : 1, marginTop: 10 }}>
+        <div style={{ opacity: busy || stale ? 0.5 : 1, marginTop: 10 }}>
           {tab === "overview" && (
             <>
               <SiteResult data={data} />
@@ -505,7 +516,7 @@ export function PlannerScreen({
           </Button>
           {data && (
             <Button type="button" icon="timeline-bar-chart" onClick={() => setView("results")}>
-              View last result
+              {stale ? "View last result (inputs changed)" : "View last result"}
             </Button>
           )}
           <span style={{ flex: 1 }} />

@@ -87,10 +87,11 @@ export async function fetchTemplates(): Promise<MissionTemplate[]> {
   return body.templates ?? [];
 }
 
-export async function fetchSite(form: PlannerForm): Promise<SitePayload> {
+export async function fetchSite(form: PlannerForm, signal?: AbortSignal): Promise<SitePayload> {
   // ponytail: the API's mock ignores the form too, so one exported payload is faithful.
   const res = await fetch(
     STATIC_DEMO ? `${BASE}demo/site-mock.json` : apiUrl(`/site?${buildSiteQuery(form)}`),
+    { signal },
   );
   const body = await res.json();
   if (!res.ok) {

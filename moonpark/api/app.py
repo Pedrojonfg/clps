@@ -191,6 +191,43 @@ class RegionMapBody(BaseModel):
     best: dict[str, Any] | None = None
 
 
+def _invalid(field: str, message: str, status: int = 422, error: str = "invalid_input") -> HTTPException:
+    """Client mistake: 4xx with a message naming the field (503 stays reserved for missing data)."""
+    return HTTPException(status_code=status, detail={"error": error, "field": field, "message": message})
+
+
+def _utc_window(start: str, end: str) -> tuple[str, str]:
+    """Parse ISO start/end (naive = UTC, offsets converted) into Z strings; ValueError when unparseable or not ordered."""
+    out = []
+    for name, raw in (("start", start), ("end", end)):
+        try:
+            t = datetime.fromisoformat(raw.strip())
+        except ValueError:
+            raise ValueError(f"{name} is not an ISO-8601 time: {raw!r}") from None
+        t = t.replace(tzinfo=timezone.utc) if t.tzinfo is None else t.astimezone(timezone.utc)
+        out.append(t)
+    if out[1] <= out[0]:
+        raise ValueError("end must be strictly after start")
+    return tuple(f"{t:%Y-%m-%dT%H:%M:%S}Z" for t in out)  # type: ignore[return-value]
+
+
+def _check_step_min(step_min: int) -> None:
+    # Windows are whole hours sliced as hours*60//step_min samples (planner_payload, deep search):
+    # only a step that divides 60 lands every window edge on a sample.
+    if 60 % step_min:
+        raise ValueError(
+            f"step_min must divide 60 evenly (1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30 or 60), got {step_min}"
+        )
+
+
+def _check_template(template_id: str | None) -> dict | None:
+    from moonpark.planner_templates import TEMPLATES, template_needs
+
+    if template_id and template_id not in TEMPLATES:
+        raise _invalid("template_id", f"unknown template_id {template_id!r}; see /mission-templates")
+    return template_needs(template_id)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -224,7 +261,10 @@ def mission_templates() -> dict:
 
 
 @app.get("/terrain")
-def terrain(lat: float = Query(...), lon: float = Query(...)) -> dict:
+def terrain(
+    lat: float = Query(..., ge=-90, le=90, allow_inf_nan=False),
+    lon: float = Query(..., allow_inf_nan=False),
+) -> dict:
     """Ring-mesh relief from our own DEMs for the first-person view; 503 when no DEM covers the site."""
     from moonpark.terrain import TerrainUnavailable, rings_for
 
@@ -237,23 +277,23 @@ def terrain(lat: float = Query(...), lon: float = Query(...)) -> dict:
 @app.get("/site")
 def site(
     mock: int = Query(0, description="1 = CI mock only"),
-    lat: float | None = Query(None),
-    lon: float | None = Query(None),
+    lat: float | None = Query(None, ge=-90, le=90, allow_inf_nan=False),
+    lon: float | None = Query(None, allow_inf_nan=False),
     start: str | None = Query(None),
     end: str | None = Query(None),
     step_h: int = Query(1, ge=1, le=24),
     step_min: int | None = Query(None, ge=1, le=1440, description="sample step in minutes; wins over step_h"),
     template_id: str | None = Query(None),
-    max_night_h: int | None = Query(None),
-    max_no_earth_h: int | None = Query(None),
+    max_night_h: int | None = Query(None, ge=0),
+    max_no_earth_h: int | None = Query(None, ge=0),
     min_continuous_lit_h: int = Query(0, ge=0),
-    min_total_lit_h: float = Query(0, ge=0, description="minimum total hours of light in the window; 0 = no requirement"),
+    min_total_lit_h: float = Query(0, ge=0, allow_inf_nan=False, description="minimum total hours of light in the window; 0 = no requirement"),
     require_both: bool = Query(False),
-    battery_wh: float | None = Query(None, gt=0, description="energy mode: usable battery capacity (Wh)"),
-    array_w: float | None = Query(None, ge=0, description="energy mode: array power at normal incidence (W)"),
-    dark_w: float | None = Query(None, ge=0, description="energy mode: load in darkness (W)"),
-    endurance_h: float | None = Query(None, gt=0, description="energy mode: darkness endurance (h); dark_w = battery_wh / endurance_h"),
-    lit_w: float | None = Query(None, ge=0, description="load when lit (W); default = dark_w"),
+    battery_wh: float | None = Query(None, gt=0, allow_inf_nan=False, description="energy mode: usable battery capacity (Wh)"),
+    array_w: float | None = Query(None, ge=0, allow_inf_nan=False, description="energy mode: array power at normal incidence (W)"),
+    dark_w: float | None = Query(None, ge=0, allow_inf_nan=False, description="energy mode: load in darkness (W)"),
+    endurance_h: float | None = Query(None, gt=0, allow_inf_nan=False, description="energy mode: darkness endurance (h); dark_w = battery_wh / endurance_h"),
+    lit_w: float | None = Query(None, ge=0, allow_inf_nan=False, description="load when lit (W); default = dark_w"),
     panel: str | None = Query(None, description="horizontal | fixed_vertical | tracking_vertical"),
     panel_az_deg: float | None = Query(None, ge=0, lt=360, description="fixed_vertical: geographic azimuth from north"),
     reserve_pct: float | None = Query(None, ge=0, lt=100, description="minimum battery reserve, % of capacity (default 10)"),
@@ -272,14 +312,24 @@ def site(
         return _mock_site_payload(local_search=local_search == 1)
 
     from moonpark.planner_payload import build_planner_payload, kernels_available, parse_time_window
-    from moonpark.planner_templates import DEMO_SITE01, template_needs
+    from moonpark.planner_templates import DEMO_SITE01, HAZARD_LIMITS_DEFAULT
     from moonpark.providers import Site
 
-    tpl = template_needs(template_id)
+    # Structural validation first: no kernel/DEM access until the request is known to be well formed.
+    tpl = _check_template(template_id)
     lat_v = float(lat if lat is not None else DEMO_SITE01["lat_deg"])
     lon_v = float(lon if lon is not None else DEMO_SITE01["lon_deg"])
-    start_v = start or "2027-01-01T00:00:00Z"
-    end_v = end or "2027-01-01T23:00:00Z"
+    step_m = int(step_min) if step_min is not None else int(step_h) * 60
+    try:
+        if step_min is not None:
+            _check_step_min(step_m)
+    except ValueError as e:
+        raise _invalid("step_min", str(e)) from None
+    try:
+        start_v, end_v = _utc_window(start or "2027-01-01T00:00:00Z", end or "2027-01-01T23:00:00Z")
+        times = parse_time_window(start_v, end_v, step_min=step_m)
+    except ValueError as e:
+        raise _invalid("start/end", str(e)) from None
 
     needs = tpl or {
         "max_night_h": max_night_h if max_night_h is not None else 72,
@@ -305,11 +355,6 @@ def site(
                 status_code=422,
                 detail="energy mode needs battery_wh, array_w and dark_w (or endurance_h)",
             )
-    if not kernels_available():
-        raise HTTPException(
-            status_code=503,
-            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk; use mock=1 in CI."},
-        )
 
     # per D-20261117-pj-0c5e: explicit hazard limit > template > global default; empty = off
     for key, raw in (
@@ -321,9 +366,27 @@ def site(
             continue
         txt = raw.strip().lower()
         try:
-            needs[key] = None if txt in ("", "none") else float(txt)
+            val = None if txt in ("", "none") else float(txt)
         except ValueError:
-            raise HTTPException(status_code=422, detail=f"{key} must be a number or empty") from None
+            raise _invalid(key, f"{key} must be a number or empty") from None
+        if val is not None and not math.isfinite(val):
+            raise _invalid(key, f"{key} must be a finite number or empty, got {raw!r}")
+        if key == "min_soil_resistance" and val is not None and val < 0:
+            raise _invalid(key, f"min_soil_resistance must be >= 0, got {val}")
+        needs[key] = val
+    t_min = needs.get("min_temperature_k", HAZARD_LIMITS_DEFAULT["min_temperature_k"])
+    t_max = needs.get("max_temperature_k", HAZARD_LIMITS_DEFAULT["max_temperature_k"])
+    if t_min is not None and t_max is not None and float(t_min) > float(t_max):
+        raise _invalid(
+            "min_temperature_k",
+            f"min_temperature_k ({t_min}) must not exceed max_temperature_k ({t_max})",
+        )
+
+    if not kernels_available():
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "kernels_missing", "message": "SPICE kernels not on disk; use mock=1 in CI."},
+        )
     if tpl:
         sun_pct = tpl["sun_lit_percent"]
         earth_pct = tpl["earth_lit_percent"]
@@ -335,8 +398,6 @@ def site(
 
     site_obj = Site(lat_deg=lat_v, lon_deg=lon_v, observer_height_m=2.0)
     try:
-        step_m = int(step_min) if step_min is not None else int(step_h) * 60
-        times = parse_time_window(start_v, end_v, step_min=step_m)
         return build_planner_payload(
             site_obj,
             times,
@@ -353,9 +414,9 @@ def site(
             status_code=503,
             detail={"error": "dem_missing", "message": str(e)},
         ) from e
-    except Exception as e:
+    except Exception as e:  # input is validated above, so anything left is an internal fault
         raise HTTPException(
-            status_code=503,
+            status_code=500,
             detail={"error": "planner_failed", "message": str(e)},
         ) from e
 
@@ -364,10 +425,10 @@ class DeepSearchBody(BaseModel):
     """POST /deep-search body. # per D-60a3 D-c159 D-54f0"""
 
     mode: str = Field(default="optimized")
-    lat_min: float
-    lat_max: float
-    lon_min: float
-    lon_max: float
+    lat_min: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lat_max: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lon_min: float = Field(allow_inf_nan=False)
+    lon_max: float = Field(allow_inf_nan=False)
     start: str
     end: str
     window_hours: int = Field(default=24, ge=1, le=168)
@@ -392,6 +453,20 @@ def _iso_row(row: dict | None) -> dict | None:
 @app.post("/deep-search")
 def deep_search_endpoint(body: DeepSearchBody):
     # per D-60a3 dedicated endpoint; D-54f0 modes; D-c159 rect snap
+    # Structural validation first: no kernel/cap access until the request is known to be well formed.
+    for lo, hi in (("lat_min", "lat_max"), ("lon_min", "lon_max")):
+        if getattr(body, lo) > getattr(body, hi):
+            raise _invalid(lo, f"{lo} must not exceed {hi}")
+    try:
+        _check_step_min(int(body.step_min))
+    except ValueError as e:
+        raise _invalid("step_min", str(e)) from None
+    tpl = _check_template(body.template_id)
+    try:
+        start_v, end_v = _utc_window(body.start, body.end)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"error": "bad_time", "message": str(e)}) from e
+
     if body.mock:
         from moonpark.search.mock_deep import mock_deep_search
 
@@ -401,7 +476,7 @@ def deep_search_endpoint(body: DeepSearchBody):
             body.lat_max,
             body.lon_min,
             body.lon_max,
-            body.start,
+            start_v,
             body.window_hours,
         )
     from moonpark.ephemeris import SpiceEphemeris
@@ -411,7 +486,6 @@ def deep_search_endpoint(body: DeepSearchBody):
         sites_in_latlon_rect,
     )
     from moonpark.planner_payload import kernels_available, parse_time_window
-    from moonpark.planner_templates import template_needs
     from moonpark.search.deep import DEFAULT_LEADERBOARD_N, DEFAULT_TMAX_S, deep_search
     from moonpark.visibility import series as vis_series
 
@@ -426,7 +500,6 @@ def deep_search_endpoint(body: DeepSearchBody):
             detail={"error": "cap_missing", "message": "1 km cap index not on disk"},
         )
 
-    tpl = template_needs(body.template_id)
     if tpl:
         needs = {
             "max_night_h": int(tpl["max_night_h"]),
@@ -454,7 +527,7 @@ def deep_search_endpoint(body: DeepSearchBody):
         )
 
     try:
-        span = parse_time_window(body.start, body.end, step_h=1)
+        span = parse_time_window(start_v, end_v, step_h=1)
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"error": "bad_time", "message": str(e)}) from e
 
@@ -470,7 +543,7 @@ def deep_search_endpoint(body: DeepSearchBody):
     n_starts = len(span) - wh
     starts = span[:n_starts]
     step_m = int(body.step_min)
-    fine_span = span if step_m == 60 else parse_time_window(body.start, body.end, step_min=step_m)
+    fine_span = span if step_m == 60 else parse_time_window(start_v, end_v, step_min=step_m)
     sites = [c[0] for c in cells]
     site_xy = [(c[1], c[2]) for c in cells]
 

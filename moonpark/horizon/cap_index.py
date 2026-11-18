@@ -114,7 +114,12 @@ def sites_in_latlon_rect(
     ]
     xs, ys = zip(*(polar_stereo_xy(la, lo) for la, lo in corners))
     hit = sites_in_xy_rect(min(xs), max(xs), min(ys), max(ys))
-    return [c for c in hit if lo_lat <= c[0].lat_deg <= hi_lat]
+    width = hi_lon - lo_lon
+    if width >= 360.0:
+        in_lon = lambda lon: True  # noqa: E731
+    else:
+        in_lon = lambda lon: (lon - lo_lon) % 360.0 <= width  # noqa: E731  (handles 0/360 wrap)
+    return [c for c in hit if lo_lat <= c[0].lat_deg <= hi_lat and in_lon(c[0].lon_deg)]
 
 
 @lru_cache(maxsize=64)

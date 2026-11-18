@@ -102,17 +102,13 @@ def build_planner_payload(
     }
     if energy is not None:
         score_needs["energy_reserve_frac"] = energy.reserve_frac
-    if hazards_enabled and raw_hz.get("aggregate"):
+    if hazards_enabled:
         # Limits: explicit in `needs` (None = switched off), else the global default (D-20261117-pj-0c5e).
-        agg = raw_hz["aggregate"]
-        have = {
-            "max_temperature_k": agg.get("temperature_k"),
-            "min_temperature_k": agg.get("temperature_min_k", agg.get("temperature_k")),
-            "min_soil_resistance": agg.get("soil_resistance"),
-        }
+        # A limit stays in the requirements even when its data is missing; score() then flags the gap
+        # (hazard_gap_star) instead of silently reporting the site as viable.
         for key, default in HAZARD_LIMITS_DEFAULT.items():
             limit = needs[key] if key in needs else default
-            if limit is not None and have[key] is not None:
+            if limit is not None:
                 score_needs[key] = float(limit)
 
     scored = score(_series_json(vis), hazards_payload, score_needs)
@@ -163,7 +159,8 @@ def build_planner_payload(
     if local_search:
         from moonpark.search.local import DEFAULT_RADIUS_KM, local_search as run_local_search
 
-        window_hours = max(len(times) - 1, 0)
+        # Elapsed time, not sample count: with step_min < 60 len(times)-1 is not hours.
+        window_hours = max(int(round((np.datetime64(times[-1], "s") - np.datetime64(times[0], "s")) / np.timedelta64(1, "h"))), 0)
         anchor = np.datetime64(times[0], "s")
         neighbour_sites: list[Site] = []  # per D-ecc9: no 1 km grid in prod path
 

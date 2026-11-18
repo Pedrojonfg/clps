@@ -49,6 +49,10 @@ def _hazard_gap_star(hazards: dict, needs: dict) -> bool:
         return True
     if needs.get("min_soil_resistance") is not None and _hazard_field(hazards, "soil_resistance") is None:
         return True
+    if needs.get("min_temperature_k") is not None and (
+        _hazard_field(hazards, "temperature_min_k") is None and _hazard_field(hazards, "temperature_k") is None
+    ):
+        return True
     return False
 
 

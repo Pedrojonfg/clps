@@ -586,3 +586,11 @@ def test_dust_margin_is_relative_and_only_with_a_positive_limit() -> None:
     tight = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.80})
     ample = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.10})
     assert tight["feasible"] and ample["feasible"] and ample["score"] > tight["score"]
+
+
+def test_missing_hazard_data_flags_gap_for_each_limit() -> None:
+    base = {"max_night_h": 50, "max_no_earth_h": 20, "require_both": False}
+    series = {"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True}
+    for limit in ({"max_temperature_k": 300.0}, {"min_temperature_k": 100.0}, {"min_soil_resistance": 1.0}):
+        result = score(series=series, hazards={}, needs={**base, **limit})
+        assert result.get("hazard_gap_star") is True, limit

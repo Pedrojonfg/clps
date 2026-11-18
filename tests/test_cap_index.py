@@ -46,3 +46,11 @@ def test_nearest_cap_mask_snaps_within_a_cell():
     assert m is not None and m.elevation_deg.shape == (720,)
     # Far outside the cap: no cell, no mask.
     assert nearest_cap_mask(Site(lat_deg=-60.0, lon_deg=0.0, observer_height_m=2.0)) is None
+
+
+def test_latlon_rect_filters_by_longitude() -> None:
+    lo, hi = SITE01.lon_deg - 0.5, SITE01.lon_deg + 0.5
+    cells = sites_in_latlon_rect(-90.0, -80.0, lo, hi)
+    assert cells
+    for site, *_rest in cells:
+        assert lo <= site.lon_deg <= hi
