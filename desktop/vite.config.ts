@@ -23,6 +23,7 @@ export default defineConfig(() => ({
     host: host || "0.0.0.0",
     proxy: {
       "/site": api,
+      "/progress": api,
       "/mission-templates": api,
       "/deep-search": api,
       "/region-map": api,

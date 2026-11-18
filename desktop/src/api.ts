@@ -60,6 +60,26 @@ export function buildSiteQuery(form: PlannerForm): string {
   return p.toString();
 }
 
+export type DownloadProgress = {
+  active: boolean;
+  file: string | null;
+  done: number;
+  total: number;
+  files_done: number;
+  bytes_done: number;
+};
+
+/** Data-store download in flight on the engine; null when unavailable (demo, old engine). */
+export async function fetchProgress(): Promise<DownloadProgress | null> {
+  if (STATIC_DEMO) return null;
+  try {
+    const res = await fetch(apiUrl("/progress"));
+    return res.ok ? ((await res.json()) as DownloadProgress) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchTemplates(): Promise<MissionTemplate[]> {
   const res = await fetch(STATIC_DEMO ? `${BASE}demo/mission-templates.json` : apiUrl("/mission-templates"));
   if (!res.ok) throw new Error(`templates HTTP ${res.status}`);
