@@ -8,6 +8,7 @@ import {
   FormGroup,
   HTMLSelect,
   InputGroup,
+  ProgressBar,
   Radio,
   Spinner,
   Tab,
@@ -183,9 +184,28 @@ export function PlannerScreen({
         <Callout style={{ marginBottom: 8 }}>
           {busy && <Spinner size={16} />} {status}
           {dl && (
-            <div className={Classes.TEXT_MUTED} style={{ marginTop: 4, fontSize: 12 }}>
-              First use: downloading data — {dl.file} ({mb(dl.done)} / {mb(dl.total)} MB) · {dl.files_done} files,{" "}
-              {mb(dl.bytes_done)} MB so far. It is stored on this machine and not downloaded again.
+            <div style={{ marginTop: 8 }} role="status" aria-live="polite">
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12 }}>
+                <span>First use: downloading data</span>
+                <span className={Classes.MONOSPACE_TEXT} style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {dl.total > 0 ? Math.round((100 * dl.done) / dl.total) : 0} %
+                </span>
+              </div>
+              <ProgressBar
+                value={dl.total > 0 ? Math.min(1, dl.done / dl.total) : undefined}
+                animate={false}
+                stripes={false}
+                style={{ margin: "4px 0" }}
+              />
+              <div
+                className={`${Classes.TEXT_MUTED} ${Classes.MONOSPACE_TEXT}`}
+                style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+              >
+                {dl.file} · {mb(dl.done)} / {mb(dl.total)} MB · {dl.files_done} files, {mb(dl.bytes_done)} MB in total
+              </div>
+              <div className={Classes.TEXT_MUTED} style={{ fontSize: 11, marginTop: 2 }}>
+                Stored on this machine; it is not downloaded again and works offline afterwards.
+              </div>
             </div>
           )}
         </Callout>
