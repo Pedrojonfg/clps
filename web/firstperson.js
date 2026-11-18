@@ -875,10 +875,10 @@
             vec2 p = materialInput.st;
             vec3 pe = materialInput.positionToEyeEC;
             float dist = length(pe);
-            float near = 1.0 - smoothstep(60.0, 700.0, dist);
+            float near = 1.0 - smoothstep(25.0, 300.0, dist);
 
             // Micro-relief in metres (hummocks and pits), faded with distance.
-            float h = ((fbm(p / 0.9) - 0.5) * 0.6 + (fbm(p / 7.0) - 0.5) * 2.5) * near;
+            float h = ((fbm(p / 0.9) - 0.5) * 0.10 + (fbm(p / 7.0) - 0.5) * 0.45) * near;
             vec3 n = normalize(materialInput.normalEC);
             vec3 dpdx = dFdx(pe), dpdy = dFdy(pe);
             vec3 r1 = cross(dpdy, n), r2 = cross(n, dpdx);
@@ -889,8 +889,14 @@
             // Tone: slow patches of brighter and darker regolith plus a little grain.
             float tone = 0.72 + 0.55 * fbm(p / 60.0) + 0.18 * (fbm(p / 2.5) - 0.5) * near;
             vec3 tint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0), u_sun);
-            material.diffuse = vec3(0.31, 0.30, 0.285) * tone * tint * u_sun;
+            // Cesium's czm_phong lights diffuse from fixed camera-relative directions and only uses the
+            // light for specular, so the relief would never follow our Sun. Light it here, from the
+            // scene light (our Sun azimuth at a fixed relief angle, D-7304), through emission.
+            float lambert = max(dot(normalize(material.normal), czm_lightDirectionEC), 0.0);
+            vec3 albedo = vec3(0.31, 0.30, 0.285) * tone;
+            material.diffuse = vec3(0.0);
             material.specular = 0.0;
+            material.emission = albedo * (0.12 + 2.2 * lambert) * tint * u_sun;
             return material;
           }
         `,
@@ -899,7 +905,7 @@
     viewer.scene.primitives.add(
       new Cesium.Primitive({
         geometryInstances: new Cesium.GeometryInstance({ geometry }),
-        appearance: new Cesium.MaterialAppearance({ material, materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED, translucent: false, closed: false }),
+        appearance: new Cesium.MaterialAppearance({ material, materialSupport: Cesium.MaterialAppearance.MaterialSupport.TEXTURED, translucent: false, closed: true }),
         modelMatrix: enu,
         asynchronous: false,
         compressVertices: false,

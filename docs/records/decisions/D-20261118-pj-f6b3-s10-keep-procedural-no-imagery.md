@@ -36,7 +36,7 @@ From a 2 m eye almost everything seen is within a few hundred metres, where one 
 
 ## Checks raised
 
-- Open observation, not yet understood: the relief shows hard-edged flat patches of different brightness (see the comparison images with grain off). Ruled out by test: mesh density (3x denser mesh, same patches), seams between DEM tiers (5, 10 and 20 m heights agree within about 0.5 m), the far ring, the data itself (hillshades of the DEMs and of the ring grid are smooth, median slope 5.6 degrees). The pattern also did not change when the relief light elevation went from 20 to 60 degrees, which suggests the relief is not being lit by our light direction as intended. Needs its own diagnosis before any fix is promised.
+- Observation that came out of the comparison, now resolved: the relief showed hard-edged flat patches of different brightness and did not respond to the light direction (same pixels for relief light at 10, 60, 90 degrees). Ruled out first: mesh density, seams between DEM tiers (heights agree within about 0.5 m), the far ring, the data itself. Cause, found by printing the normals and the light in the shader: Cesium's `czm_phong` lights diffuse only from fixed camera-relative directions (eye axis and eye up) and uses the scene light for specular only, and `MaterialAppearance` with `closed: false` flips every normal that has a negative eye-space z. Level ground seen toward the horizon has exactly that, so it was flipped to face down and lit by the camera headlamp, giving the patches. Fix in `web/firstperson.js`: `closed: true`, and Lambert from `czm_lightDirectionEC` computed in the material and written to `emission`; bump grain reduced (it was too strong once lit) and faded sooner. The relief now follows our Sun azimuth at the fixed relief angle (`D-7304`); the earlier "brightness follows our Sun-disc fraction" part was unaffected.
 
 ## Expected behavior and validation
 
@@ -46,4 +46,4 @@ Wrong if users ask for textured ground and ion is not an acceptable answer; revi
 
 - No code change from the experiment; the throw-away patch and script are kept only under `docs/experiments/imagery-drape/`.
 - `D-e5d2` stays as the record of the spike; this record closes the question.
-- Follow-up candidate: diagnose why the relief shading does not follow our light direction.
+- The imagery comparison above was rendered with the old, camera-lit shading; the verdict stands, since the photo's problem is scale and baked shadows, not lighting, but a re-run could look slightly different.
