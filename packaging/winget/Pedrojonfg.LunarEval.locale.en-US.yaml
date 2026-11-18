@@ -1,0 +1,14 @@
+PackageIdentifier: Pedrojonfg.LunarEval
+PackageVersion: X.Y.Z
+PackageLocale: en-US
+Publisher: Pedrojonfg
+PackageName: lunar-eval
+License: TODO-SET-LICENSE   # the repo has no LICENSE yet; decide before submitting
+ShortDescription: Landing-site and time-window evaluator for the lunar south pole.
+PackageUrl: https://github.com/Pedrojonfg/clps
+Tags:
+  - moon
+  - space
+  - mission-planning
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
