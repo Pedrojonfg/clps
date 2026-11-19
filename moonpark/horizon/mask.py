@@ -1,4 +1,4 @@
-"""Topographic horizon mask. # per D-20261114-pj-f369 D-20261114-pj-9e53"""
+"""Topographic horizon mask. # per D-20261114-pj-f369 D-20261114-pj-9e53 D-20261118-pj-d90c"""
 
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ def mask(site: Site, schedule=None) -> HorizonMask:
             observer_height_m=site.observer_height_m,
             schedule_version=SCHEDULE_VERSION,
             dem_ids=(),
+            fill_stats={"filled_pixels": 0, "out_of_coverage_samples": 0},
         )
 
     ex, ey = -x_m, -y_m
@@ -40,7 +41,8 @@ def mask(site: Site, schedule=None) -> HorizonMask:
     nx, ny = -ey, ex
 
     g0 = schedule[0][2]
-    h0_ground = float(g0.sample(np.array([x_m]), np.array([y_m]))[0])
+    h0_arr, n_out = g0.sample_with_stats(np.array([x_m]), np.array([y_m]))
+    h0_ground = float(h0_arr[0])
     h0 = h0_ground + site.observer_height_m
 
     az = np.radians(np.arange(NAZ) * 0.5)
@@ -54,7 +56,8 @@ def mask(site: Site, schedule=None) -> HorizonMask:
             continue
         X = x_m + d[None, :] * (ca * ex + sa * nx)
         Y = y_m + d[None, :] * (ca * ey + sa * ny)
-        h = g.sample(X, Y)
+        h, n = g.sample_with_stats(X, Y)
+        n_out += n
         ang = np.degrees(np.arctan((h - h0 - d ** 2 / (2.0 * R_M)) / d))
         best = np.maximum(best, ang.max(axis=1))
 
@@ -68,4 +71,8 @@ def mask(site: Site, schedule=None) -> HorizonMask:
         observer_height_m=site.observer_height_m,
         schedule_version=SCHEDULE_VERSION,
         dem_ids=(),
+        fill_stats={
+            "filled_pixels": sum({id(g.source): g.n_filled for _, _, g in schedule}.values()),
+            "out_of_coverage_samples": int(n_out),
+        },
     )

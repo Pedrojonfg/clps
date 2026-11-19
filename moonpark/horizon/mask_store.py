@@ -1,4 +1,4 @@
-"""Cache horizon masks under data/masks/. # per D-20261114-pj-aa58 D-20261114-pj-f369"""
+"""Cache horizon masks under data/masks/. # per D-20261114-pj-aa58 D-20261114-pj-f369 D-20261118-pj-d90c"""
 
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ def load_cached_mask(site: Site) -> HorizonMask | None:
         observer_height_m=float(info["observer_height_m"]),
         schedule_version=str(info["schedule_version"]),
         dem_ids=tuple(info.get("dem_ids", ())),
+        fill_stats=info.get("fill_stats"),  # absent in caches written before D-d90c
     )
 
 
@@ -60,6 +61,7 @@ def save_mask(site: Site, horizon: HorizonMask) -> None:
                 "observer_height_m": horizon.observer_height_m,
                 "schedule_version": horizon.schedule_version,
                 "dem_ids": list(horizon.dem_ids),
+                "fill_stats": horizon.fill_stats,
             },
             indent=0,
         ),

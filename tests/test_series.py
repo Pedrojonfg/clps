@@ -99,7 +99,9 @@ def test_series_flags_longest_and_any_both() -> None:
     ]
     out = series(samples, horizon, sun_threshold=0.0, earth_threshold=0.0, bridge_h=1)
     assert out["longest_night_h"] == 1
-    assert out["longest_no_earth_h"] == len(samples)
+    # D-9413: both earth samples dark -> one run, window = 2 samples = 1 h (closed grid, last - first);
+    # upper bound clipped to the window: min(e+1, n-1) - max(s-1, 0) = 1 - 0 = 1 step = 1 h = len(samples) - 1
+    assert out["longest_no_earth_h"] == len(samples) - 1 == 1
     assert out["any_both"] is False
     lit = np.asarray(out["sun_fraction"]) > 0.0
     assert out["longest_lit_h"] == longest_lit_h(out["sun_fraction"], lit_threshold=0.0, bridge_h=1)
@@ -147,8 +149,11 @@ def test_series_hours_above_threshold_default_thresholds() -> None:
     earth = np.asarray(out["earth_fraction"])
     assert int((sun > 0.0).sum()) == 3  # hours 0, 1, 3
     assert int((earth > 0.0).sum()) == 2  # hours 0, 2
-    assert out["hours_sun_above_threshold"] == int((sun > 0.0).sum())
-    assert out["hours_earth_above_threshold"] == int((earth > 0.0).sum())
+    # D-9413: total = sum of per-run (last - first) lower bounds, 1 h step.
+    # sun lit runs: [0,1] -> 1 - 0 = 1 h; [3] -> single sample = 0 h; total 1 h (was 3 samples = 3)
+    assert out["hours_sun_above_threshold"] == 1
+    # earth lit runs: [0] -> 0 h; [2] -> 0 h; total 0 h (was 2)
+    assert out["hours_earth_above_threshold"] == 0
 
 
 def test_series_hours_above_threshold_respects_custom_thresholds() -> None:
@@ -157,8 +162,11 @@ def test_series_hours_above_threshold_respects_custom_thresholds() -> None:
     earth = np.asarray(out["earth_fraction"])
     # partial sun at hour 3 is above 0 but not above 0.99 -> strict threshold matters
     assert 0.0 < sun[3] < 0.99
-    assert out["hours_sun_above_threshold"] == int((sun > 0.99).sum()) == 2
-    assert out["hours_earth_above_threshold"] == int((earth > 0.5).sum()) == 2
+    assert int((sun > 0.99).sum()) == 2  # samples 0, 1
+    assert int((earth > 0.5).sum()) == 2  # samples 0, 2
+    # D-9413: sun run [0,1] -> 1 - 0 = 1 h (was 2 samples); earth runs [0], [2] are single samples -> 0 + 0 = 0 h (was 2)
+    assert out["hours_sun_above_threshold"] == 1
+    assert out["hours_earth_above_threshold"] == 0
 
 
 def test_series_hours_above_threshold_strict_greater_than() -> None:

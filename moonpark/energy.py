@@ -90,14 +90,24 @@ def soc_series(
     step_h: float,
     lit_threshold: float = 0.0,
 ) -> NDArray[np.float64]:
-    """SOC as a fraction of capacity, one value per sample, starting full (sample 0 is the initial 100 %)."""
+    """SOC as a fraction of capacity, one value per sample, starting full at t_0 (D-20261118-pj-9413).
+
+    The n samples bound n-1 intervals. Pessimistic: an interval is lit only if both endpoint samples are lit,
+    and then generates the smaller of its two endpoint powers; its load is the larger of the endpoint loads.
+    """
     frac = np.asarray(sun_fraction, dtype=np.float64)
     gen = params.array_w * frac * incidence_cos(sun_az_deg, sun_el_deg, params.panel, params.panel_az_deg)
+    lit = frac > lit_threshold
     lit_w = params.dark_w if params.lit_w is None else params.lit_w
-    load = np.where(frac > lit_threshold, lit_w, params.dark_w)
+    load = np.where(lit, lit_w, params.dark_w)
+    both = lit[:-1] & lit[1:]
+    net_wh = (
+        np.where(both, np.minimum(gen[:-1], gen[1:]), 0.0) * params.charge_eff - np.maximum(load[:-1], load[1:])
+    ) * step_h
     soc = np.empty(len(frac), dtype=np.float64)
     wh = params.capacity_wh
     for i in range(len(frac)):
         soc[i] = wh / params.capacity_wh
-        wh = min(params.capacity_wh, max(0.0, wh + (gen[i] * params.charge_eff - load[i]) * step_h))
+        if i < len(net_wh):
+            wh = min(params.capacity_wh, max(0.0, wh + net_wh[i]))
     return soc

@@ -1,3 +1,5 @@
+mod analyses;
+
 use std::net::TcpListener;
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -100,7 +102,16 @@ pub fn run() {
             app.manage(Engine { inner: Mutex::new(engine) });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![api_base, engine_status, restart_engine])
+        .invoke_handler(tauri::generate_handler![
+            api_base,
+            engine_status,
+            restart_engine,
+            analyses::analyses_dir,
+            analyses::save_analysis,
+            analyses::list_analyses,
+            analyses::read_analysis,
+            analyses::delete_analysis
+        ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {

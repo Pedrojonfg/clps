@@ -52,6 +52,7 @@ class HorizonMask:
     observer_height_m: float
     schedule_version: str
     dem_ids: tuple[str, ...]
+    fill_stats: dict[str, int] | None = None  # filled_pixels, out_of_coverage_samples # per D-20261118-pj-d90c
 
 
 class EphemerisProvider(Protocol):

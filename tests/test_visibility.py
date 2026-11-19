@@ -26,7 +26,8 @@ def test_sun_fraction_disc() -> None:
 @pytest.mark.parametrize(
     "fraction,expected",
     [
-        (np.array([1.0, 0.0, 0.0, 0.0, 1.0]), 3),
+        # D-20261118-pj-9413: maximum-type, upper hole-to-hole bound t_4 - t_0 (was a sample count, 3)
+        (np.array([1.0, 0.0, 0.0, 0.0, 1.0]), 4),
     ],
 )
 def test_longest_night_h(fraction: np.ndarray, expected: int) -> None:
@@ -36,16 +37,20 @@ def test_longest_night_h(fraction: np.ndarray, expected: int) -> None:
 @pytest.mark.parametrize(
     "fraction,bridge_h,expected",
     [
-        (np.array([1.0, 1.0, 0.0, 1.0, 1.0]), 0, 2),
-        (np.array([1.0, 1.0, 0.0, 1.0, 1.0]), 1, 5),
-        (np.array([1.0, 1.0, 0.0, 0.0, 1.0, 1.0]), 1, 2),
+        # D-20261118-pj-9413: minimum-type, lower bound last-minus-first lit sample (were sample counts 2, 5, 2)
+        (np.array([1.0, 1.0, 0.0, 1.0, 1.0]), 0, 1),
+        # D-9413 pessimistic bridge: k dark samples may last (k + 1) steps; bridged only if (k + 1) * step <= bridge_h
+        (np.array([1.0, 1.0, 0.0, 1.0, 1.0]), 1, 1),  # 1 dark sample, up to 2 h > 1 h: not bridged (was 4)
+        (np.array([1.0, 1.0, 0.0, 1.0, 1.0]), 2, 4),
+        (np.array([1.0, 1.0, 0.0, 0.0, 1.0, 1.0]), 1, 1),
     ],
 )
 def test_longest_lit_h(fraction: np.ndarray, bridge_h: int, expected: int) -> None:
     assert longest_lit_h(fraction, lit_threshold=0.0, bridge_h=bridge_h) == expected
 
 def test_series_exposes_hour_counts_consistent_with_fractions() -> None:
-    """D-7520: hours_*_above_threshold = count(fraction > threshold) over the series."""
+    """hours_*_above_threshold = sum over lit runs of (last - first lit sample) (D-20261118-pj-9413,
+    superseding the sample count of D-7520)."""
     from moonpark.providers import HorizonMask, SkySample
     from moonpark.visibility import series
 
@@ -75,5 +80,7 @@ def test_series_exposes_hour_counts_consistent_with_fractions() -> None:
         for i, (el, eel) in enumerate([(20.0, 90.0), (20.0, -90.0), (0.0, 90.0), (0.0, -90.0)])
     ]
     out = series(samples, horizon, sun_threshold=0.5, earth_threshold=0.5)
-    assert out["hours_sun_above_threshold"] == int((np.asarray(out["sun_fraction"]) > 0.5).sum()) == 2
-    assert out["hours_earth_above_threshold"] == int((np.asarray(out["earth_fraction"]) > 0.5).sum()) == 2
+    assert int((np.asarray(out["sun_fraction"]) > 0.5).sum()) == 2  # one lit run, samples 0..1
+    assert int((np.asarray(out["earth_fraction"]) > 0.5).sum()) == 2  # two single-sample lit runs
+    assert out["hours_sun_above_threshold"] == 1
+    assert out["hours_earth_above_threshold"] == 0

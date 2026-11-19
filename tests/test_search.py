@@ -1,7 +1,7 @@
 """S6 local search: neighbours x time slide, ranked pick + leaderboard.
 
 per D-9cc5 (time slide, distance_hours, leaderboard), D-72bc (radius 5 km, neighbours
-always scanned, pick ordering), D-f57e (same hazards as request, hazard_gap_star rows kept),
+always scanned, pick ordering), D-f57e (same hazards as request), D-75f1/D-b3dc (windows with an unevaluated set limit dropped and counted),
 D-5577 (infeasible rows carry display score 0 + companion_score).
 """
 
@@ -190,13 +190,15 @@ def test_neighbour_outside_radius_is_never_scanned_or_picked() -> None:
     assert result["pick"]["feasible"] is False
 
 
-def test_hazards_from_evaluate_gate_feasibility_and_gap_star_rows_are_kept() -> None:
-    # per D-f57e: same hazards as the request; starred rows stay in the leaderboard.
+def test_hazards_from_evaluate_gate_feasibility_and_gap_star_rows_are_dropped() -> None:
+    # per D-f57e: same hazards as the request. Per D-75f1 / D-b3dc (reviewer fix) a window whose set limit is
+    # not evaluated (starred) is dropped from the leaderboard and counted, no longer kept as a starred row.
     needs = {**NEEDS, "max_temperature_k": 350.0}
 
     def evaluate(site, start, hours):
-        if _is_origin(site):
-            return {"series": _series(night=100), "hazards": {}, "hazard_gap_star": False}
+        if _is_origin(site):  # hazards present (else its windows would be dropped too): infeasible by night
+            return {"series": _series(night=100), "hazards": {"aggregate": {"temperature_k": 200.0}},
+                    "hazard_gap_star": False}
         if site == NEAR:
             return {
                 "series": _series(),
@@ -211,9 +213,10 @@ def test_hazards_from_evaluate_gate_feasibility_and_gap_star_rows_are_kept() -> 
     hot = [r for r in result["leaderboard"] if r["site"]["lon_deg"] == pytest.approx(NEAR.lon_deg)]
     starred = [r for r in result["leaderboard"] if r["site"]["lon_deg"] == pytest.approx(NEAR_B.lon_deg)]
     assert hot and all(r["feasible"] is False and r["score"] == 0 and r["companion_score"] > 0 for r in hot)
-    assert starred and all(r["hazard_gap_star"] is True for r in starred)
-    assert result["pick"]["hazard_gap_star"] is True
-    assert result["pick"]["feasible"] is True
+    assert starred == []
+    assert result["dropped_windows"] == 2 * HOURS + 1  # every NEAR_B window
+    assert not any(r["hazard_gap_star"] for r in result["leaderboard"])
+    assert result["pick"]["feasible"] is False  # origin night=100 and NEAR too hot: nothing feasible left
 
 
 def test_empty_neighbour_list_does_not_raise() -> None:

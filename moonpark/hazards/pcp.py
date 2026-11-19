@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-from moonpark.hazards.lst import lst_bin_index, local_solar_time_h_from_utc
+from moonpark.hazards.lst import HazardDataUnavailable, et_from_utc, lst_bin_index, local_solar_time_h_from_utc
 from moonpark.horizon.mask import R_M
 
 PRODUCT_ID = "urn:nasa:pds:lro_diviner_derived1:data_derived_pcp"
@@ -24,24 +24,24 @@ _SEASON_BY_DAY: dict[str, str] = {}
 
 
 def _south_season(time_utc: np.datetime64) -> str:
-    """Williams et al. 2019: south summer when subsolar latitude < 0."""
+    """Williams et al. 2019: south summer when subsolar latitude < 0.
+
+    Raises HazardDataUnavailable when SPICE or its kernels fail; never guesses a season and never caches
+    a failure. # per D-20261118-pj-b3dc"""
     day = str(np.datetime64(time_utc, "D"))
     cached = _SEASON_BY_DAY.get(day)
     if cached is not None:
         return cached
+    et = et_from_utc(time_utc)  # raises HazardDataUnavailable
     try:
-        import spiceypy as spice
-        from moonpark.ephemeris.spice import KERNEL_DIR, _furnsh
+        import spiceypy
 
-        _furnsh(KERNEL_DIR)
-        iso = str(np.datetime64(time_utc, "s")).replace("T", " ")
-        et = spice.utc2et(iso + " UTC")
-        pos, _ = spice.spkpos("SUN", et, "MOON_ME", "LT+S", "MOON")
+        pos, _ = spiceypy.spkpos("SUN", et, "MOON_ME", "LT+S", "MOON")
         r = math.sqrt(float(pos[0]) ** 2 + float(pos[1]) ** 2 + float(pos[2]) ** 2)
         lat = math.degrees(math.asin(float(pos[2]) / r))
-        season = "summer" if lat < 0.0 else "winter"
-    except Exception:
-        season = "summer"
+    except Exception as exc:
+        raise HazardDataUnavailable(f"season unavailable: {exc}") from exc
+    season = "summer" if lat < 0.0 else "winter"
     _SEASON_BY_DAY[day] = season
     return season
 
@@ -137,12 +137,7 @@ class PolarPcpClimatology:
             return self._cache[key]
         path = self._bin_path(season, bin_1based)
         if path is None:
-            alt = "winter" if season == "summer" else "summer"
-            path = self._bin_path(alt, bin_1based)
-            if path is None:
-                return None
-            season = alt
-            key = (season, bin_1based)
+            return None  # no other-season substitute (D-20261118-pj-b3dc); not cached so a retry can find it
         with np.load(path) as z:
             x = np.asarray(z["x"], dtype=np.float64)
             y = np.asarray(z["y"], dtype=np.float64)
@@ -182,8 +177,8 @@ class PolarPcpClimatology:
         }
         cache = self._load_bin(season, bin_1)
         if cache is None:
+            # Not cached: after a retried download the bin must be picked up (D-20261118-pj-b3dc).
             meta["status"] = "missing_pcp_bin"
-            self._value_cache[value_key] = (None, dict(meta))
             return None, meta
 
         x_m, y_m = polar_stereo_xy(lat_deg, lon_deg)

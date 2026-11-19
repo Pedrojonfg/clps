@@ -5,7 +5,7 @@ kind: task
 owner: pj
 branch: fix/audit-p0-code-bugs
 created: 2026-11-18T14:53:47Z
-stage: build
+stage: audit
 relates: [D-20261114-pj-9cc5, D-20261114-pj-f57e, D-20261114-pj-5cfa, D-20261114-pj-41a2]
 ---
 # Respond to the external audit: P0/P1 findings
@@ -64,3 +64,7 @@ None.
 ## Fog / out of scope
 
 - Item 39 dependency lock (tool choice, minor); items 31, 36, 37 (testing/usability passes)
+
+## Build (2026-11-19, unattended run)
+
+All decided items implemented on branch feat/audit-decisions-impl (uncommitted): suite 533 passed / 1 skipped, desktop build and cargo check green. Not done / not verifiable: 1 km masks recompute and republish (D-d90c), real publishing to R2 (D-62d3, D-6fea), app never run (CSP, Tauri commands, UI flows), Diviner noon convention only checked statistically, licence of elevation data unclear (docs/relief-licence.md). Findings: dev-machine own-DEM masks skip the 0-2 km near field (up to 17 deg lower than cap masks); data/dem/ldem_87s_5mpp.tif is truncated; PCP climatology bins incomplete locally (95/96 summer, 87/96 winter).
