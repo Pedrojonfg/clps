@@ -21,6 +21,7 @@ data/masks/
 data/precompute/
 data/fixtures/
 data/hazards/
+data/relief_tiles/
 data/megatest_deep_search_last.json
 
 # Isolated worktrees / agent scratch

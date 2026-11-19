@@ -1,4 +1,4 @@
-"""Local site×time search (S6). # per D-9cc5 D-72bc D-f57e D-5577"""
+"""Local site×time search (S6). # per D-9cc5 D-72bc D-f57e D-5577 D-75f1 D-b3dc"""
 
 from __future__ import annotations
 
@@ -56,19 +56,22 @@ def local_search(
 
     starts = window_slide_starts(anchor, window_hours)
     rows: list[dict] = []
+    dropped = 0
     h = int(window_hours)
     for site in sites:
         dist_km = _site_km(origin, site)
         for start in starts:
             ev = evaluate(site, start, h)
+            if ev is None:  # the window lacks hazard data for a limit the user set (D-75f1 / D-b3dc)
+                dropped += 1
+                continue
             series = ev["series"]
             hazards = ev.get("hazards") or {}
             scored = score(series, hazards, needs)
-            if "hazard_gap_star" in ev:
-                gap = bool(ev["hazard_gap_star"])
-            else:
-                gap = bool(scored.get("hazard_gap_star"))
-            gap = gap or bool(scored.get("hazard_gap_star"))
+            gap = bool(ev.get("hazard_gap_star")) or bool(scored.get("hazard_gap_star"))
+            if gap:  # a set limit is not evaluated: dropped and counted, never a starred row (D-75f1 / D-b3dc)
+                dropped += 1
+                continue
             rows.append(
                 {
                     "site": {"lat_deg": site.lat_deg, "lon_deg": site.lon_deg},
@@ -77,7 +80,7 @@ def local_search(
                     "feasible": scored["feasible"],
                     "score": scored["score"],
                     "companion_score": scored["companion_score"],
-                    "hazard_gap_star": gap,
+                    "hazard_gap_star": False,  # kept for the row schema; starred windows are dropped above
                     "distance_hours": _distance_hours(anchor, start),
                     "distance_km": dist_km,
                 }
@@ -85,7 +88,7 @@ def local_search(
 
     leaderboard = sorted(rows, key=_sort_key)
     pick = leaderboard[0] if leaderboard else None
-    return {"pick": pick, "leaderboard": leaderboard}
+    return {"pick": pick, "leaderboard": leaderboard, "dropped_windows": dropped}
 
 
 def nearest_feasible_time(times, series_per_window, needs, t0):

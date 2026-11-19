@@ -12,6 +12,13 @@ from moonpark.hazards.temperature import ClimatologyTable
 from moonpark.providers import Site
 from moonpark.score import score
 
+from pathlib import Path as _Path
+
+_needs_spice = pytest.mark.skipif(
+    not (_Path(__file__).resolve().parents[1] / 'data' / 'kernels' / 'de440s.bsp').is_file(),
+    reason='SPICE kernels not present',
+)
+
 
 def test_quadrant_idw_fills_centre_from_neighbors() -> None:
     g = np.full((5, 5), np.nan)
@@ -44,10 +51,12 @@ def test_climatology_lookup_by_lst_bin() -> None:
     assert k2 == 110.0
 
 
+@_needs_spice
 def test_moon_hazards_returns_hourly_contract() -> None:
     site = Site(lat_deg=-89.0, lon_deg=1.5)
     times = np.array(["2026-07-01T00:00"], dtype="datetime64[h]")
-    table = ClimatologyTable(bins_k={0: 250.0}, season="summer")
+    # Every bin filled: with SPICE local solar time (D-20261118-pj-633d) the hour no longer maps to bin 0.
+    table = ClimatologyTable(bins_k={i: 250.0 for i in range(96)}, season="summer")
     mh = MoonHazards(climatology=table, slope_path=None, psr_path=None)
     out = mh.hazards(site, times)
     assert len(out["hours"]) == 1
@@ -77,6 +86,7 @@ def test_lst_bin_index_wraps_daily_grid() -> None:
     assert lst_bin_index(23.9) == lst_bin_index(23.9 % 24)
 
 
+@_needs_spice
 def test_local_solar_time_shifts_with_longitude() -> None:
     t = np.datetime64("2026-01-01T00:00")
     lst0 = local_solar_time_h_from_utc(t, 0.0)
@@ -84,26 +94,31 @@ def test_local_solar_time_shifts_with_longitude() -> None:
     assert lst_east == pytest.approx((lst0 + 6.0) % 24.0)
 
 
+@_needs_spice
 def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
-    # Synthetic summer ltim01 around lon=0, lat=-89 (normalized stereo).
+    # Synthetic bin around lon=0, lat=-89 (normalized stereo), written for the season and SPICE local-time bin
+    # of the request (D-20261118-pj-633d: LST from et2lst; D-20261118-pj-b3dc: no other-season fallback).
+    from moonpark.hazards.pcp import _south_season
     from moonpark.horizon import polar_stereo_xy
     from moonpark.horizon.mask import R_M
 
+    t = np.datetime64("2027-01-01T00:00")
+    bin0 = lst_bin_index(local_solar_time_h_from_utc(t, 0.0))
     x_m, y_m = polar_stereo_xy(-89.0, 0.0)
     xn, yn = x_m / R_M, y_m / R_M
-    season_dir = tmp_path / "summer"
+    season_dir = tmp_path / _south_season(t)
     season_dir.mkdir()
     np.savez_compressed(
-        season_dir / "ltim01.npz",
+        season_dir / f"ltim{bin0 + 1:02d}.npz",
         x=np.array([xn], dtype=np.float32),
         y=np.array([yn], dtype=np.float32),
         tbol=np.array([210.0], dtype=np.float32),
         r_km=np.float32(1737.4),
     )
     pcp = PolarPcpClimatology(root=tmp_path)
-    val, meta = pcp.at_site_time(np.datetime64("2027-01-01T00:00"), -89.0, 0.0)
+    val, meta = pcp.at_site_time(t, -89.0, 0.0)
     assert val == pytest.approx(210.0)
-    assert meta["lst_bin"] == 0
+    assert meta["lst_bin"] == bin0
     assert meta["product"].startswith("urn:nasa:pds:lro_diviner_derived1")
 
 def test_spread_k_is_spatial_only() -> None:

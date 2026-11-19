@@ -45,7 +45,11 @@ def test_four_hours_twenty_minutes_four_hours_drains_the_battery() -> None:
 def test_long_light_refills_the_battery() -> None:
     frac, az, el = _scenario(4, 4, 4)
     soc = soc_series(frac, az, el, PARAMS, step_h=TEN_MIN_H)
-    assert soc.min() == pytest.approx(0.2, abs=0.01)  # first night 100 -> 20 %, never lower
+    # D-20261118-pj-9413 (pessimistic intervals): each night is 24 dark intervals (4 h, -80 Wh) and the 24 lit
+    # samples give only 23 lit intervals (3 h 50 min, +76.7 Wh), so night 1 ends at 20 % and night 2 at 16.7 %.
+    assert soc[24] == pytest.approx(0.2, abs=1e-9)
+    assert soc[47] == pytest.approx(0.2 + 23 * 20 / 6 / 100, abs=1e-9)
+    assert soc.min() == pytest.approx(0.2 + 23 * 20 / 6 / 100 - 0.8, abs=1e-9)
 
 
 def test_score_energy_mode_fails_where_the_night_proxy_passes() -> None:

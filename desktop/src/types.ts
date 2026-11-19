@@ -15,6 +15,25 @@ export type MissionTemplate = {
   min_soil_resistance?: number | null;
 };
 
+export type SiteProvenance = {
+  engine_version?: string;
+  formula_version?: string;
+  effective_needs?: Record<string, unknown>;
+  step_min?: number;
+  observer_height_m?: number;
+  data_version?: string | null;
+  approximations?: string[];
+  mask?: {
+    requested_lat: number;
+    requested_lon: number;
+    lat: number;
+    lon: number;
+    distance_m: number;
+    source: string;
+  };
+  fill?: { filled_pixels: number; out_of_coverage_samples: number } | null;
+};
+
 export type SitePayload = {
   data_source?: string;
   site?: { lat_deg: number; lon_deg: number; name?: string };
@@ -39,6 +58,10 @@ export type SitePayload = {
     longest_night_h: number;
     longest_no_earth_h: number;
     longest_lit_h?: number;
+    /** Pessimistic bounds (D-9413): the night / no-Earth gap is at least this, the lit run at most this. */
+    longest_night_h_lower?: number;
+    longest_no_earth_h_lower?: number;
+    longest_lit_h_upper?: number;
     hours_sun_above_threshold?: number;
     hours_earth_above_threshold?: number;
     any_both?: boolean;
@@ -48,7 +71,10 @@ export type SitePayload = {
     soc?: number[];
     soc_min?: number;
   };
-  needs: Record<string, number | boolean | undefined>;
+  needs: Record<string, number | boolean | undefined | string[]> & { not_evaluated?: string[] };
+  hazards_status?: { status: string; unavailable: Record<string, string> };
+  warnings?: Array<{ code: string; fields?: string[]; message: string }>;
+  provenance?: SiteProvenance;
   score: {
     feasible: boolean;
     score: number;
@@ -146,11 +172,11 @@ export const DEMO_SITE = {
 
 export type AppScreen = "analyses" | "planner" | "firstperson" | "map";
 
-export type SavedAnalysis = {
+/** Fields every saved file has, in the list and in the full record. */
+type AnalysisEnvelope = {
   id: string;
   createdAt: string;
   label: string;
-  form: PlannerForm;
   summary: {
     feasible: boolean;
     score: number;
@@ -159,6 +185,44 @@ export type SavedAnalysis = {
     longest_no_earth_h?: number;
     longest_lit_h?: number;
   };
+  // D-20261118-pj-8625: set for analyses stored as files (absent for browser-demo localStorage ones).
+  formatVersion?: number;
+  dataVersion?: string | null;
+  appVersion?: string | null;
+  /** "search" = a stopped region search kept to be continued (D-20261118-pj-1454); absent = a site analysis. */
+  kind?: "analysis" | "search";
+};
+
+/**
+ * One row of the saved-analyses list (Rust `list_analyses`, or the browser fallback). It does NOT carry
+ * the form: only the few form inputs the list shows, any of which can be missing in an old or edited file.
+ */
+export type SavedAnalysis = AnalysisEnvelope & {
+  start?: string | null;
+  end?: string | null;
+  lat?: string | null;
+  lon?: string | null;
+  templateId?: string | null;
+};
+
+/** The full stored record (what one file in Documents/Moonpark holds); read with openAnalysis. */
+export type StoredAnalysis = AnalysisEnvelope & { form: PlannerForm; payload: SitePayload };
+
+export type SearchWarning = { code: string; message: string; fields?: string[]; count?: number };
+
+/** POST /deep-search body as the desktop sends it (requirement fields = GET /site names, D-20261118-pj-75f1). */
+export type DeepSearchRequest = Record<string, unknown> & {
+  mode: "optimized" | "total_coverage";
+  lat_min: number;
+  lat_max: number;
+  lon_min: number;
+  lon_max: number;
+  start: string;
+  end: string;
+  window_hours: number;
+  step_min: number;
+  mock: boolean;
+  hazards_enabled: boolean;
 };
 
 export type RegionSearchSummary = {
@@ -170,4 +234,46 @@ export type RegionSearchSummary = {
   mock?: boolean;
   window_start: string;
   window_hours: number;
+  /** Effective requirements the search evaluated (server's response.requirements). */
+  requirements: Record<string, unknown> | null;
+  warnings: SearchWarning[];
+  dropped_cells: number;
+  state: "complete" | "stopped";
+  /** Opaque resume state of a stopped run (D-20261118-pj-1454). */
+  checkpoint: Record<string, unknown> | null;
+  /** Exact body sent; a resume must repeat it (the checkpoint is tied to range, window, mode and requirements). */
+  request: DeepSearchRequest;
+  /** Rows evaluated so far, as handed to the region map. */
+  rows: Array<{ lat_deg: number; lon_deg: number; score: number; feasible: boolean; companion_score: number }>;
+  best: { lat_deg: number; lon_deg: number } | null;
 };
+
+/** What a "Continue" of a stopped search hands the region map. */
+export type SearchResume = {
+  /** Id of the saved stopped-search file (overwritten if stopped again, removed when it completes). */
+  id: string;
+  label: string;
+  request: DeepSearchRequest;
+  checkpoint: Record<string, unknown>;
+};
+
+/** Template id whose schedule values all equal the form's, else "" (Custom) (D-20261118-pj-70ec). */
+export function matchingTemplateId(form: PlannerForm, templates: MissionTemplate[]): string {
+  const num = (a: string, b: number | undefined | null, dflt = 0) => a !== "" && Number(a) === (b ?? dflt);
+  const hz = (a: string | undefined, b: number | null | undefined) => (b == null ? (a ?? "") === "" : (a ?? "") !== "" && Number(a) === b);
+  const t = templates.find(
+    (t) =>
+      num(form.max_night_h, t.max_night_h) &&
+      num(form.max_no_earth_h, t.max_no_earth_h) &&
+      num(form.min_continuous_lit_h, t.min_continuous_lit_h) &&
+      num(form.min_total_lit_h, t.min_total_lit_h) &&
+      num(form.sun_lit_percent, t.sun_lit_percent) &&
+      num(form.earth_lit_percent, t.earth_lit_percent) &&
+      num(form.bridge_h, t.bridge_h) &&
+      form.require_both === t.require_both &&
+      hz(form.max_temperature_k, t.max_temperature_k) &&
+      hz(form.min_temperature_k, t.min_temperature_k) &&
+      hz(form.min_soil_resistance, t.min_soil_resistance),
+  );
+  return t?.id ?? "";
+}

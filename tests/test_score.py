@@ -52,7 +52,8 @@ def expected_score(series: dict, needs: dict, n: int | None = None) -> tuple[flo
         ps.append(phi(s_lit / SIGMA_LIT))
         terms.append((0.1, _clip01(s_lit / max(min_lit, 1))))
     if n is None:
-        n = len(series["sun_fraction"]) if "sun_fraction" in series else 0
+        # D-9413: window length in hours on the closed grid = (samples - 1) x step (hourly unless step_min given)
+        n = (len(series["sun_fraction"]) - 1) * series.get("step_min", 60) / 60 if "sun_fraction" in series else 0
     n_div = max(n, 1)
     terms.append((1.0, _clip01(int(series.get("hours_sun_above_threshold", 0)) / n_div)))
     terms.append((1.0, _clip01(int(series.get("hours_earth_above_threshold", 0)) / n_div)))
@@ -586,3 +587,28 @@ def test_dust_margin_is_relative_and_only_with_a_positive_limit() -> None:
     tight = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.80})
     ample = score(series, _hz(250.0, 5.0, res=0.85), {**base, "min_soil_resistance": 0.10})
     assert tight["feasible"] and ample["feasible"] and ample["score"] > tight["score"]
+
+
+def test_missing_hazard_data_flags_gap_for_each_limit() -> None:
+    base = {"max_night_h": 50, "max_no_earth_h": 20, "require_both": False}
+    series = {"longest_night_h": 40, "longest_no_earth_h": 10, "any_both": True}
+    for limit in ({"max_temperature_k": 300.0}, {"min_temperature_k": 100.0}, {"min_soil_resistance": 1.0}):
+        result = score(series=series, hazards={}, needs={**base, **limit})
+        assert result.get("hazard_gap_star") is True, limit
+
+
+def test_bonus_basis_is_window_length_not_sample_count() -> None:
+    """D-9413: an all-lit 24 h window (25 hourly or 145 ten-minute samples) has bonus basis 24 h, not 25 or 24.17."""
+    needs = {"max_night_h": 10, "max_no_earth_h": 10}
+    common = {"longest_night_h": 0, "longest_no_earth_h": 0, "longest_lit_h": 24, "any_both": True}
+    # hourly: 25 samples, 24 h lit (lower bound last - first = 24) -> 24 / ((25 - 1) x 1) = 1
+    hourly = {**common, "sun_fraction": [1.0] * 25, "earth_fraction": [1.0] * 25,
+              "hours_sun_above_threshold": 24, "hours_earth_above_threshold": 24}
+    # 10 min: 145 samples, 24 h lit -> 24 / ((145 - 1) x 10 / 60) = 24 / 24 = 1
+    fine = {**common, "sun_fraction": [1.0] * 145, "earth_fraction": [1.0] * 145, "step_min": 10,
+            "hours_sun_above_threshold": 24, "hours_earth_above_threshold": 24}
+    b_hourly = score(hourly, {}, needs)["breakdown"]["layer1_B"]
+    b_fine = score(fine, {}, needs)["breakdown"]["layer1_B"]
+    # terms: night slack 10/10 = 1 (w .1), no-earth 1 (w .1), sun 1, earth 1 -> B = (.1 + .1 + 1 + 1) / 2.2 = 1
+    assert b_hourly == pytest.approx(1.0, abs=1e-9)
+    assert b_fine == pytest.approx(1.0, abs=1e-9)

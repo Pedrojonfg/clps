@@ -19,6 +19,10 @@ AGG_KEYS = (
     "longest_lit_h",
     "hours_sun_above_threshold",
     "hours_earth_above_threshold",
+    # D-9413: the other interval bound of each duration
+    "longest_night_h_lower",
+    "longest_no_earth_h_lower",
+    "longest_lit_h_upper",
 )
 
 pytestmark = pytest.mark.skipif(not real_data_available(), reason="Site01 DEM or kernels not present")
@@ -37,6 +41,17 @@ def _week_payload() -> dict:
     )
 
 
+def _sum_run_spans(lit: list[bool]) -> int:
+    total, start = 0, None
+    for i, v in enumerate(lit + [False]):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            total += (i - 1) - start
+            start = None
+    return total
+
+
 def test_week_series_has_aggregate_keys_and_bounds() -> None:
     s = _week_payload()["series"]
     n = len(s["sun_fraction"])
@@ -44,9 +59,13 @@ def test_week_series_has_aggregate_keys_and_bounds() -> None:
     for key in AGG_KEYS:
         assert key in s, f"series missing {key}"
         assert isinstance(s[key], int)
-        assert 0 <= s[key] <= n
-    assert s["hours_sun_above_threshold"] == sum(1 for v in s["sun_fraction"] if v > 0.0)
-    assert s["hours_earth_above_threshold"] == sum(1 for v in s["earth_fraction"] if v > 0.0)
+        assert 0 <= s[key] <= n - 1  # D-9413: window length is (n - 1) h on the closed grid
+    assert s["longest_night_h_lower"] <= s["longest_night_h"]
+    assert s["longest_no_earth_h_lower"] <= s["longest_no_earth_h"]
+    assert s["longest_lit_h"] <= s["longest_lit_h_upper"]
+    # D-9413: total lit time = sum over lit runs of (last - first), single sample = 0 h (not a sample count)
+    assert s["hours_sun_above_threshold"] == _sum_run_spans([v > 0.0 for v in s["sun_fraction"]])
+    assert s["hours_earth_above_threshold"] == _sum_run_spans([v > 0.0 for v in s["earth_fraction"]])
 
 
 @pytest.mark.skipif(not GOLDEN.is_file(), reason="golden fixture not generated yet")

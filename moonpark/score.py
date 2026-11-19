@@ -1,4 +1,4 @@
-"""Needs-adapted score (P4). # D-7520 D-6ce5 D-48ee D-7af3 D-9e53 D-5cfa D-5577 D-f57e"""
+"""Needs-adapted score (P4). # D-7520 D-6ce5 D-48ee D-7af3 D-9e53 D-5cfa D-5577 D-f57e D-9413"""
 
 from __future__ import annotations
 
@@ -43,11 +43,28 @@ def _hazard_field(hazards: dict, key: str):
     return agg.get(key)
 
 
+def limit_requested(key: str, value) -> bool:
+    """A requirement is requested when it constrains anything: None/False and a minimum <= 0 mean "no
+    requirement" (a minimum of 0 is what the desktop sends for an unset soil limit)."""
+    if value is None or value is False:
+        return False
+    if key.startswith("min_"):
+        try:
+            return float(value) > 0
+        except (TypeError, ValueError):
+            return True
+    return True
+
+
 def _hazard_gap_star(hazards: dict, needs: dict) -> bool:
     # per D-f57e: star only when requirement set but hazard value absent (temperature/dust).
-    if needs.get("max_temperature_k") is not None and _hazard_field(hazards, "temperature_k") is None:
+    if limit_requested("max_temperature_k", needs.get("max_temperature_k")) and _hazard_field(hazards, "temperature_k") is None:
         return True
-    if needs.get("min_soil_resistance") is not None and _hazard_field(hazards, "soil_resistance") is None:
+    if limit_requested("min_soil_resistance", needs.get("min_soil_resistance")) and _hazard_field(hazards, "soil_resistance") is None:
+        return True
+    if limit_requested("min_temperature_k", needs.get("min_temperature_k")) and (
+        _hazard_field(hazards, "temperature_min_k") is None and _hazard_field(hazards, "temperature_k") is None
+    ):
         return True
     return False
 
@@ -58,7 +75,7 @@ def _surface_layer0(hazards: dict, needs: dict) -> list[str]:
     min_res = needs.get("min_soil_resistance")
     temp_k = _hazard_field(hazards, "temperature_k")
     res = _hazard_field(hazards, "soil_resistance")
-    if max_temp is not None and temp_k is not None and temp_k > float(max_temp):
+    if max_temp is not None and temp_k is not None and temp_k >= float(max_temp):  # maximum: fails at equality (D-9413)
         failing.append("temperature")
     min_temp = needs.get("min_temperature_k")
     temp_min_k = _hazard_field(hazards, "temperature_min_k")
@@ -82,9 +99,10 @@ def _schedule_layer0(series: dict, needs: dict) -> list[str]:
     if _energy_mode(series):
         if float(series["soc_min"]) < _reserve(needs):
             failing.append("battery")
-    elif float(series["longest_night_h"]) > int(needs["max_night_h"]):
+    # Maximum-type limits fail at equality, minimum-type pass at equality (D-20261118-pj-9413).
+    elif float(series["longest_night_h"]) >= int(needs["max_night_h"]):
         failing.append("night")
-    if no_earth > max_no_earth:
+    if no_earth >= max_no_earth:
         failing.append("no_earth")
     if require_both and not series.get("any_both", False):
         failing.append("both")
@@ -166,7 +184,8 @@ def _layer1_score(series: dict, needs: dict, hazards: dict | None = None) -> tup
     ps.extend(hz_ps)
 
     if "sun_fraction" in series:
-        n_div = max(len(series["sun_fraction"]) * float(series.get("step_min", 60)) / 60.0, 1.0)
+        # D-20261118-pj-9413: window length = (samples - 1) x step on the closed grid, not a sample count.
+        n_div = max((len(series["sun_fraction"]) - 1) * float(series.get("step_min", 60)) / 60.0, 1.0)
     else:
         n_div = 1.0
     hours_sun = float(series.get("hours_sun_above_threshold", 0))
@@ -195,7 +214,7 @@ def score(series: dict, hazards: dict, needs: dict) -> dict:
     provenance = {
         "score_formula": FORMULA,
         "schedule_version": series.get("schedule_version", "n/a"),
-        "decisions": ["D-7520", "D-6ce5", "D-48ee", "D-7af3", "D-9e53", "D-5cfa", "D-5577", "D-f57e"],
+        "decisions": ["D-7520", "D-6ce5", "D-48ee", "D-7af3", "D-9e53", "D-5cfa", "D-5577", "D-f57e", "D-9413"],
         "hazard_margins": hazard_margins,
         "sigmas_h": {
             "night": _SIGMA_NIGHT,

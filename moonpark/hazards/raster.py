@@ -9,25 +9,41 @@ import numpy as np
 from moonpark.horizon import polar_stereo_xy
 
 
-def sample_geotiff(path: Path, lat_deg: float, lon_deg: float) -> float | None:
+def sample_geotiff_status(path: Path, lat_deg: float, lon_deg: float) -> tuple[float | None, str]:
+    """(value, status) with status "ok", "missing_file", "unreadable", "outside_raster" or "nodata".
+
+    Lets callers say why a value is absent instead of substituting one (D-20261118-pj-b3dc)."""
+    if path is None or not Path(path).is_file():
+        return None, "missing_file"
     import rasterio
 
     x, y = polar_stereo_xy(lat_deg, lon_deg)
-    with rasterio.open(path) as src:
+    try:
+        src_cm = rasterio.open(path)
+    except Exception:
+        return None, "unreadable"
+    with src_cm as src:
         try:
             row, col = src.index(x, y)
         except Exception:
-            return None
+            return None, "outside_raster"
         if row < 0 or col < 0 or row >= src.height or col >= src.width:
-            return None
-        band = src.read(1, window=((row, row + 1), (col, col + 1)))
+            return None, "outside_raster"
+        try:
+            band = src.read(1, window=((row, row + 1), (col, col + 1)))
+        except Exception:
+            return None, "unreadable"
         val = float(band[0, 0])
         nodata = src.nodata
         if nodata is not None and val == float(nodata):
-            return None
+            return None, "nodata"
         if not np.isfinite(val):
-            return None
-        return val
+            return None, "nodata"
+        return val, "ok"
+
+
+def sample_geotiff(path: Path, lat_deg: float, lon_deg: float) -> float | None:
+    return sample_geotiff_status(path, lat_deg, lon_deg)[0]
 
 
 def sample_window(path: Path, lat_deg: float, lon_deg: float, *, win_px: int = 5) -> np.ndarray | None:

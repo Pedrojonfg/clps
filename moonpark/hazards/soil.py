@@ -14,15 +14,19 @@ ALPHA_J_M3 = 0.289
 BETA_FLOOR = 0.05
 
 
-def soil_resistance(slope_deg: float) -> float:
-    """Metzger soil-side denominator: ρ g D β + α with β = cos(θ) (D-06cb)."""
+def soil_resistance(slope_deg: float | None) -> float | None:
+    """Metzger soil-side denominator: ρ g D β + α with β = cos(θ) (D-06cb).
+
+    None when the slope is not available: no flat-terrain substitute (D-20261118-pj-b3dc)."""
+    if slope_deg is None:
+        return None
     beta = max(BETA_FLOOR, math.cos(math.radians(slope_deg)))
     return RHO_BULK_KG_M3 * G_M * MEAN_D_M * beta + ALPHA_J_M3
 
 
-def soil_provenance(slope_deg: float) -> dict:
-    """Nested provenance for the dust / soil_resistance row (D-06cb, D-9ed6)."""
-    beta = max(BETA_FLOOR, math.cos(math.radians(slope_deg)))
+def soil_provenance(slope_deg: float | None) -> dict:
+    """Nested provenance for the dust / soil_resistance row (D-06cb, D-9ed6). beta is None without slope."""
+    beta = None if slope_deg is None else max(BETA_FLOOR, math.cos(math.radians(slope_deg)))
     return {
         "label": "soil_erodibility_resistance_not_lofting_rate",
         "formula": "rho_m * g * D * beta + alpha",

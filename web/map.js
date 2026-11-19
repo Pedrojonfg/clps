@@ -23,6 +23,25 @@ const ESTIMATE_ALPHA = 0.6; // at an evaluated cell; falls to 0 at reach (D-1df2
 const PICK_PX = 24; // pointer snaps to the nearest evaluated cell within this radius (D-2325)
 const TOP_N = 8;
 const INFEASIBLE_RGB = [176, 131, 240];
+
+/** Readable text for an API error `detail`: string, FastAPI 422 list of {loc, msg}, or {message|error, field} (as desktop/src/api.ts errorText). */
+function errorText(detail, fallback) {
+  if (typeof detail === "string") return detail || fallback;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((d) => {
+      const loc = Array.isArray(d && d.loc) ? d.loc.filter((x) => x !== "query" && x !== "body").join(".") : "";
+      const msg = d && typeof d.msg === "string" ? d.msg : typeof d === "string" ? d : "invalid value";
+      return loc ? `${loc}: ${msg}` : msg;
+    });
+    return parts.join("; ") || fallback;
+  }
+  if (detail && typeof detail === "object") {
+    const msg = typeof detail.message === "string" ? detail.message : typeof detail.error === "string" ? detail.error : "";
+    if (msg) return typeof detail.field === "string" && !msg.includes(detail.field) ? `${detail.field}: ${msg}` : msg;
+  }
+  return fallback;
+}
+
 const PLANNER_KEYS = [
   "start", "end", "step_h", "template_id",
   "max_night_h", "max_no_earth_h", "min_continuous_lit_h",
@@ -835,8 +854,7 @@ async function postRegionMap(body) {
   });
   const body2 = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const d = body2.detail;
-    throw new Error(d?.message || (typeof d === "string" ? d : res.statusText));
+    throw new Error(errorText(body2.detail, res.statusText || `HTTP ${res.status}`));
   }
   return body2;
 }

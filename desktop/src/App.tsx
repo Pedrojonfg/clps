@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
+import { Component, useCallback, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
 import {
   Alignment,
   Button,
+  Callout,
   Classes,
   Navbar,
   NavbarDivider,
@@ -11,12 +12,17 @@ import {
 } from "@blueprintjs/core";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import "@blueprintjs/icons/lib/css/blueprint-icons.css";
-import { STATIC_DEMO } from "./api";
+import { STATIC_DEMO, fetchStoreVersion } from "./api";
 import {
-  clearAnalyses,
+  analysesDir,
+  clearBrowserAnalyses,
   deleteAnalysis,
+  inTauri,
   loadAnalyses,
+  openAnalysis as openStoredAnalysis,
+  openStoppedSearch,
   saveAnalysis,
+  type AnalysisFileError,
 } from "./lib/analysesStore";
 import { AnalysesScreen } from "./screens/AnalysesScreen";
 import { FirstPersonScreen } from "./screens/FirstPersonScreen";
@@ -29,6 +35,7 @@ import {
   HAZARD_LIMIT_DEFAULTS,
   PlannerForm,
   SavedAnalysis,
+  SearchResume,
   SitePayload,
 } from "./types";
 
@@ -59,33 +66,141 @@ const NAV: { id: AppScreen; label: string; icon: "timeline-events" | "plus" | "g
     { id: "map", label: "Region map", icon: "map" },
   ];
 
+/**
+ * Keeps a render error in one screen from blanking the whole window: shows the message instead,
+ * with a way back. Reset by changing `resetKey` (the screen id), so switching screens retries.
+ */
+class ScreenErrorBoundary extends Component<
+  { resetKey: string; onBack: () => void; children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Screen render error", error, info.componentStack);
+  }
+
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <Callout intent="danger" title="This screen could not be shown" style={{ margin: 16 }}>
+        <p>Something went wrong while showing this screen: {this.state.error.message || String(this.state.error)}</p>
+        <p className={Classes.TEXT_MUTED}>Your saved analyses are not affected.</p>
+        <Button icon="arrow-left" onClick={this.props.onBack}>
+          Go to New analysis
+        </Button>{" "}
+        <Button minimal icon="refresh" onClick={() => this.setState({ error: null })}>
+          Try again
+        </Button>
+      </Callout>
+    );
+  }
+}
+
 function App() {
   const [screen, setScreen] = useState<AppScreen>("planner");
   const [form, setForm] = useState<PlannerForm>(initialForm);
   const [data, setData] = useState<SitePayload | null>(null);
-  const [analyses, setAnalyses] = useState<SavedAnalysis[]>(() => loadAnalyses());
+  const [analyses, setAnalyses] = useState<SavedAnalysis[]>([]);
+  const [fileErrors, setFileErrors] = useState<AnalysisFileError[]>([]);
+  const [storeError, setStoreError] = useState<string | null>(null);
+  const [folder, setFolder] = useState<string | null>(null);
+  // Data version the engine serves now (GET /store-status), for the recalculation warning; null if unknown.
+  const [storeVersion, setStoreVersion] = useState<string | null>(null);
   const [plannerBoot, setPlannerBoot] = useState(true);
+  // A stopped region search to continue on the map (D-20261118-pj-1454); consumed once by RegionMapScreen.
+  const [searchResume, setSearchResume] = useState<(SearchResume & { form: PlannerForm }) | null>(null);
+  const onResumeHandled = useCallback(() => setSearchResume(null), []);
 
-  const refreshAnalyses = useCallback(() => {
-    setAnalyses(loadAnalyses());
+  const refreshAnalyses = useCallback(async () => {
+    try {
+      const l = await loadAnalyses();
+      setAnalyses(l.items);
+      setFileErrors(l.errors);
+      setStoreError(null);
+    } catch (e) {
+      setStoreError(e instanceof Error ? e.message : String(e));
+    }
   }, []);
 
+  useEffect(() => {
+    void refreshAnalyses();
+    analysesDir().then(setFolder).catch(() => setFolder(null));
+  }, [refreshAnalyses]);
+
+  // Best effort and never blocking: the list works without it (generic warning instead).
+  useEffect(() => {
+    let live = true;
+    void fetchStoreVersion().then((v) => {
+      if (live) setStoreVersion(v);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // MARKED (analyses agent): save is async now; PlannerScreen keeps its sync onSaved callback.
   function onSaved(f: PlannerForm, payload: SitePayload) {
-    saveAnalysis(f, payload);
-    refreshAnalyses();
+    saveAnalysis(f, payload)
+      .then(() => refreshAnalyses())
+      .catch((e) => setStoreError(`Could not save this analysis: ${e instanceof Error ? e.message : e}`));
   }
 
-  function openAnalysis(a: SavedAnalysis) {
-    setForm({ ...HAZARD_LIMIT_DEFAULTS, ...a.form });
-    setData(null);
-    setPlannerBoot(true);
-    setScreen("planner");
+  /** Show the STORED result (no recompute). */
+  async function openAnalysis(a: SavedAnalysis) {
+    try {
+      const rec = await openStoredAnalysis(a.id);
+      setForm({ ...HAZARD_LIMIT_DEFAULTS, ...rec.form });
+      setData(rec.payload);
+      setPlannerBoot(false);
+      setScreen("planner");
+    } catch (e) {
+      setStoreError(`Could not open "${a.label}": ${e instanceof Error ? e.message : e}`);
+    }
   }
 
-  function open3dFromAnalysis(a: SavedAnalysis) {
-    setForm({ ...HAZARD_LIMIT_DEFAULTS, ...a.form });
-    setData(null);
-    setScreen("firstperson");
+  /** Recompute from the stored inputs (the result may differ). */
+  async function recalculateAnalysis(a: SavedAnalysis) {
+    try {
+      const rec = await openStoredAnalysis(a.id);
+      setForm({ ...HAZARD_LIMIT_DEFAULTS, ...rec.form });
+      setData(null);
+      setPlannerBoot(true);
+      setScreen("planner");
+    } catch (e) {
+      setStoreError(`Could not open "${a.label}": ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  async function open3dFromAnalysis(a: SavedAnalysis) {
+    try {
+      const rec = await openStoredAnalysis(a.id);
+      setForm({ ...HAZARD_LIMIT_DEFAULTS, ...rec.form });
+      setData(null);
+      setScreen("firstperson");
+    } catch (e) {
+      setStoreError(`Could not open "${a.label}": ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  /** Continue a stopped search: same form, rectangle, mode, step and requirements, plus its checkpoint. */
+  async function continueSearch(a: SavedAnalysis) {
+    try {
+      const rec = await openStoppedSearch(a.id);
+      setForm({ ...HAZARD_LIMIT_DEFAULTS, ...rec.form });
+      setSearchResume(rec);
+      setScreen("map");
+    } catch (e) {
+      setStoreError(`Could not continue "${a.label}": ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   const openSite = useCallback(
@@ -136,24 +251,40 @@ function App() {
           margin: "0 auto",
         }}
       >
+        <ScreenErrorBoundary resetKey={screen} onBack={() => setScreen("planner")}>
         {screen === "analyses" && (
           <AnalysesScreen
             analyses={analyses}
+            fileErrors={fileErrors}
+            storeError={storeError}
+            folder={folder}
+            currentDataVersion={storeVersion}
             onOpen={openAnalysis}
+            onRecalculate={recalculateAnalysis}
             onNew={() => {
               setForm(initialForm);
               setData(null);
               setPlannerBoot(false);
               setScreen("planner");
             }}
-            onDelete={(id) => {
-              setAnalyses(deleteAnalysis(id));
+            onDelete={async (id) => {
+              try {
+                await deleteAnalysis(id);
+              } catch (e) {
+                setStoreError(`Could not delete: ${e instanceof Error ? e.message : e}`);
+              }
+              await refreshAnalyses();
             }}
-            onClear={() => {
-              clearAnalyses();
-              setAnalyses([]);
-            }}
+            onClear={
+              inTauri()
+                ? undefined
+                : () => {
+                    clearBrowserAnalyses();
+                    setAnalyses([]);
+                  }
+            }
             onOpen3d={open3dFromAnalysis}
+            onContinueSearch={continueSearch}
           />
         )}
 
@@ -174,7 +305,16 @@ function App() {
           <FirstPersonScreen form={form} />
         )}
 
-        {screen === "map" && <RegionMapScreen form={form} onOpenSite={openSite} />}
+        {screen === "map" && (
+          <RegionMapScreen
+            form={form}
+            onOpenSite={openSite}
+            resume={searchResume}
+            onResumeHandled={onResumeHandled}
+            onSearchStoreChanged={refreshAnalyses}
+          />
+        )}
+        </ScreenErrorBoundary>
       </main>
     </div>
   );

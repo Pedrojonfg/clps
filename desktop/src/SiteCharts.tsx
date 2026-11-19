@@ -3,7 +3,7 @@
  * needs-versus-actual. One shared time cursor links the panorama and the timeline.
  */
 import { useMemo, useRef, useState, type MouseEvent } from "react";
-import { HTMLTable, Icon, Tag } from "@blueprintjs/core";
+import { Callout, HTMLTable, Icon, Tag } from "@blueprintjs/core";
 import {
   BAD_COLOR,
   EARTH_COLOR,
@@ -476,13 +476,13 @@ function TipRow({ color, name, frac, ok }: { color: string; name: string; frac: 
 /* ------------------------------------------------------- score + needs block */
 
 const FAILING_LABEL: Record<string, string> = {
-  night: "night is longer than allowed",
-  no_earth: "the gap without Earth is longer than allowed",
+  night: "the night is not shorter than the limit",
+  no_earth: "the gap without Earth is not shorter than the limit",
   battery: "the battery falls below the reserve",
   lit: "continuous sunlight is shorter than required",
   lit_total: "total sunlight is less than required",
   both: "Sun and Earth are never visible together",
-  temperature: "the temperature exceeds the maximum",
+  temperature: "the temperature is not below the maximum",
   temperature_min: "the temperature falls below the minimum",
   dust: "soil resistance below the limit",
 };
@@ -500,15 +500,32 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
   const minTotalLit = Number(needs.min_total_lit_h ?? 0);
   const energyMode = Boolean(needs.energy_mode) && s.soc_min != null;
 
-  // Surface-hazard rows appear only when a limit is active and the data exists (D-20261117-pj-0c5e).
+  // Surface-hazard rows appear only when a limit is active; a limit listed in needs.not_evaluated is shown
+  // as "not evaluated" with the reason, never as a pass or a fail (D-20261118-pj-b3dc).
   const agg = (data.hazards as { aggregate?: Record<string, number | null> } | undefined)?.aggregate;
+  const notEval = new Set(data.needs?.not_evaluated ?? []);
+  const unavailable = data.hazards_status?.unavailable ?? {};
+  const why = (limit: string) => reasonShort(unavailable[limit === "min_soil_resistance" ? "soil_resistance" : "temperature"]);
   const hazRows: React.ComponentProps<typeof NeedRow>[] = [];
-  if (agg && needs.max_temperature_k != null && agg.temperature_k != null)
-    hazRows.push({ label: "Peak temperature", actual: Math.round(agg.temperature_k), limit: Number(needs.max_temperature_k), kind: "max", unit: "K", failed: failing.includes("temperature") });
-  if (agg && needs.min_temperature_k != null && (agg.temperature_min_k ?? agg.temperature_k) != null)
-    hazRows.push({ label: "Coldest temperature", actual: Math.round((agg.temperature_min_k ?? agg.temperature_k)!), limit: Number(needs.min_temperature_k), kind: "min", unit: "K", failed: failing.includes("temperature_min") });
-  if (agg && needs.min_soil_resistance != null && agg.soil_resistance != null)
-    hazRows.push({ label: "Soil resistance", actual: agg.soil_resistance, limit: Number(needs.min_soil_resistance), kind: "min", unit: "J/m³", digits: 2, failed: failing.includes("dust") });
+  const tMin = agg ? (agg.temperature_min_k ?? agg.temperature_k) : null;
+  if (needs.max_temperature_k != null) {
+    if (notEval.has("max_temperature_k"))
+      hazRows.push({ label: "Peak temperature", actual: 0, limit: Number(needs.max_temperature_k), kind: "max", unit: "K", failed: false, notEvaluated: why("max_temperature_k") });
+    else if (agg && agg.temperature_k != null)
+      hazRows.push({ label: "Peak temperature", actual: Math.round(agg.temperature_k), limit: Number(needs.max_temperature_k), kind: "max", unit: "K", failed: failing.includes("temperature") });
+  }
+  if (needs.min_temperature_k != null) {
+    if (notEval.has("min_temperature_k"))
+      hazRows.push({ label: "Coldest temperature", actual: 0, limit: Number(needs.min_temperature_k), kind: "min", unit: "K", failed: false, notEvaluated: why("min_temperature_k") });
+    else if (agg && tMin != null)
+      hazRows.push({ label: "Coldest temperature", actual: Math.round(tMin), limit: Number(needs.min_temperature_k), kind: "min", unit: "K", failed: failing.includes("temperature_min") });
+  }
+  if (needs.min_soil_resistance != null) {
+    if (notEval.has("min_soil_resistance"))
+      hazRows.push({ label: "Soil resistance", actual: 0, limit: Number(needs.min_soil_resistance), kind: "min", unit: "J/m³", digits: 2, failed: false, notEvaluated: why("min_soil_resistance") });
+    else if (agg && agg.soil_resistance != null)
+      hazRows.push({ label: "Soil resistance", actual: agg.soil_resistance, limit: Number(needs.min_soil_resistance), kind: "min", unit: "J/m³", digits: 2, failed: failing.includes("dust") });
+  }
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 260px) 1fr", gap: 24, alignItems: "start" }}>
@@ -525,6 +542,7 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
         <div style={{ fontSize: 11, color: INK_MUTED }}>
           Absolute scale 0 – {SCORE_CEILING}+ (higher is better)
         </div>
+        <div style={{ fontSize: 11, color: INK_MUTED }}>Ranking index, not a probability of success.</div>
         {!sc.feasible && (
           <p style={{ margin: "6px 0 0", fontSize: 12, color: INK_MUTED }}>
             {failing.length
@@ -574,6 +592,17 @@ export function ScoreSummary({ data }: { data: SitePayload }) {
   );
 }
 
+/** Short (2-3 word) reason a limit could not be checked, from the backend's reason text. */
+export function reasonShort(reason: string | undefined): string {
+  const r = (reason ?? "").toLowerCase().trim();
+  if (!r) return "data missing";
+  if (r === "temperature data missing" || r === "slope data missing") return "data missing";
+  if (r === "temperature bin missing") return "bin missing";
+  if (r === "outside temperature map" || r === "outside slope map") return "outside map";
+  if (r === "season not computable") return "season unknown";
+  return r.split(/\s+/).slice(0, 3).join(" ");
+}
+
 /** One row of the needs table: neutral bar, limit tick; colour only when the need fails (D-20261117-pj-f19a). */
 function NeedRow({
   label,
@@ -583,6 +612,7 @@ function NeedRow({
   failed,
   unit = "h",
   digits = 0,
+  notEvaluated,
 }: {
   label: string;
   actual: number;
@@ -591,16 +621,37 @@ function NeedRow({
   failed: boolean;
   unit?: string;
   digits?: number;
+  /** Short reason; set when this limit could not be checked (neither pass nor fail). */
+  notEvaluated?: string;
 }) {
   const hasLimit = Number.isFinite(limit) && (unit === "h" ? limit > 0 : true);
-  const ok = !failed && (!hasLimit || (kind === "max" ? actual <= limit : actual >= limit));
+  // A maximum fails when equal (D-20261118-pj-9413): it must stay strictly below the limit.
+  const ok = !failed && (!hasLimit || (kind === "max" ? actual < limit : actual >= limit));
+  if (notEvaluated) {
+    return (
+      <tr>
+        <td>{label}</td>
+        <td colSpan={2} style={{ textAlign: "right", color: INK_MUTED }}>
+          <span title={notEvaluated}>not evaluated</span>
+          <span style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
+            {" · "}
+            {kind === "max" ? "less than" : "at least"} {limit} {unit}
+          </span>
+        </td>
+        <td style={{ color: INK_MUTED, fontSize: 12 }}>{notEvaluated}</td>
+        <td>
+          <Icon icon="help" size={14} color={INK_MUTED} title={`Not evaluated: ${notEvaluated}`} />
+        </td>
+      </tr>
+    );
+  }
   const scale = Math.max(actual, hasLimit ? limit : 0, 1) * 1.15;
   return (
     <tr>
       <td>{label}</td>
       <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{Number(actual.toFixed(digits === 0 ? 3 : digits))} {unit}</td>
       <td style={{ textAlign: "right", fontFamily: MONO, fontVariantNumeric: "tabular-nums", color: INK_MUTED }}>
-        {hasLimit ? `${kind === "max" ? "≤" : "≥"} ${limit} ${unit}` : "none"}
+        {hasLimit ? `${kind === "max" ? "less than" : "at least"} ${limit} ${unit}` : "none"}
       </td>
       <td>
         <div style={{ position: "relative", height: 6, background: "#2f343c", borderRadius: 2 }}>
@@ -615,7 +666,7 @@ function NeedRow({
           />
           {hasLimit && (
             <span
-              title={`${kind === "max" ? "Maximum allowed" : "Minimum required"}: ${limit} ${unit}`}
+              title={`${kind === "max" ? "Must be less than" : "At least"}: ${limit} ${unit}`}
               style={{ position: "absolute", left: `${(limit / scale) * 100}%`, top: -3, width: 2, height: 12, background: INK }}
             />
           )}
@@ -630,10 +681,31 @@ function NeedRow({
 
 /* --------------------------------------------------------------- composite */
 
+/** ONE compact warning line (click to expand), instead of a stack of disclaimers. */
+function WarningLine({ warnings }: { warnings: NonNullable<SitePayload["warnings"]> }) {
+  const [open, setOpen] = useState(false);
+  const text = warnings.map((w) => w.message).join(" ");
+  return (
+    <Callout intent="warning" icon="warning-sign" style={{ padding: "6px 10px" }}>
+      <div
+        role="button"
+        tabIndex={0}
+        title={open ? "Click to collapse" : text}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setOpen((o) => !o)}
+        style={{ cursor: "pointer", fontSize: 12, ...(open ? {} : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}
+      >
+        {text}
+      </div>
+    </Callout>
+  );
+}
+
 export function SiteResult({ data }: { data: SitePayload }) {
   const [cursor, setCursor] = useState<number | null>(null);
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      {data.warnings && data.warnings.length > 0 && <WarningLine warnings={data.warnings} />}
       <ScoreSummary data={data} />
       <HorizonPanorama data={data} cursor={cursor} setCursor={setCursor} />
       <VisibilityTimeline data={data} cursor={cursor} setCursor={setCursor} />

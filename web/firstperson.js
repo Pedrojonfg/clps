@@ -33,6 +33,24 @@
   const API_BASE = (new URLSearchParams(window.location.search).get("api") || "").replace(/\/$/, "");
   const $ = (id) => document.getElementById(id);
 
+  /** Readable text for an API error `detail`: string, FastAPI 422 list of {loc, msg}, or {message|error, field} (as desktop/src/api.ts errorText). */
+  function errorText(detail, fallback) {
+    if (typeof detail === "string") return detail || fallback;
+    if (Array.isArray(detail)) {
+      const parts = detail.map((d) => {
+        const loc = Array.isArray(d && d.loc) ? d.loc.filter((x) => x !== "query" && x !== "body").join(".") : "";
+        const msg = d && typeof d.msg === "string" ? d.msg : typeof d === "string" ? d : "invalid value";
+        return loc ? `${loc}: ${msg}` : msg;
+      });
+      return parts.join("; ") || fallback;
+    }
+    if (detail && typeof detail === "object") {
+      const msg = typeof detail.message === "string" ? detail.message : typeof detail.error === "string" ? detail.error : "";
+      if (msg) return typeof detail.field === "string" && !msg.includes(detail.field) ? `${detail.field}: ${msg}` : msg;
+    }
+    return fallback;
+  }
+
   const state = {
     data: null,
     t: 0, // fractional index into data.sky; playback interpolates between samples (D-26d2)
@@ -122,7 +140,7 @@
       const isStatic = new URLSearchParams(state.query).get("static") === "1";
       const res = await fetch(isStatic ? "demo/site-mock.json" : API_BASE + "/site?" + state.query);
       const body = await res.json();
-      if (!res.ok) throw new Error(body.detail?.message || body.detail?.error || res.statusText);
+      if (!res.ok) throw new Error(errorText(body.detail, res.statusText || `HTTP ${res.status}`));
       const live = body.data_source === "real";
       status.textContent = live ? "Live site data" : "Mock site data";
       status.className = "tag " + (live ? "ok" : "warn");
@@ -266,7 +284,7 @@
 
   /**
    * Battery readout (D-20261117-pj-7b2d). With the energy model the planner sends the state of charge;
-   * without it we show an autonomy estimate relative to the user's "Max night" (dark run vs that limit,
+   * without it we show an autonomy estimate relative to the user's "Night: less than" limit (dark run vs that limit,
    * refilled by any light) and say so, never a % of a real battery.
    */
   function buildBattery(data) {
@@ -308,7 +326,7 @@
     box.title =
       b.kind === "soc"
         ? `Estimated battery state of charge from your capacity, array and load. Reserve ${Math.round(b.reserve * 100)} %.`
-        : "Estimated autonomy: time in darkness relative to your Max night, refilled by any light. Not a battery model — add battery data in the planner for that.";
+        : "Estimated autonomy: time in darkness relative to your “Night: less than” limit, refilled by any light. Not a battery model — add battery data in the planner for that.";
   }
 
   function updateReadouts() {
@@ -768,7 +786,7 @@
       const res = await fetch(url);
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const msg = body.detail?.message || body.detail?.error || res.statusText;
+        const msg = errorText(body.detail, res.statusText || `HTTP ${res.status}`);
         return { data: null, why: `Our relief is not available for this site (${msg}).` };
       }
       return { data: body, why: "" };
