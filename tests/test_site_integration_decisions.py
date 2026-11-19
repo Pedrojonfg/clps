@@ -12,6 +12,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from moonpark.api.app import app
+from moonpark.site01 import real_data_available
+
+pytestmark = pytest.mark.skipif(not real_data_available(), reason="kernels or Site01 data not present")
 
 client = TestClient(app, raise_server_exceptions=False)
 WINDOW = {"start": "2027-01-01T00:00:00Z", "end": "2027-01-01T06:00:00Z"}

@@ -293,6 +293,7 @@ def _assert_slope_unavailable(out: dict) -> None:
         assert "temperature" not in u  # only what is missing is listed
 
 
+@needs_spice
 def test_missing_slope_file_gives_none_not_zero(tmp_path) -> None:
     mh = MoonHazards(climatology=_full_table(), slope_path=tmp_path / "nope.tif", psr_path=tmp_path / "nopsr.tif")
     out = mh.hazards(_SITE, _TIMES)
@@ -300,6 +301,7 @@ def test_missing_slope_file_gives_none_not_zero(tmp_path) -> None:
     assert out["aggregate"]["temperature_k"] == 250.0  # other fields unaffected
 
 
+@needs_spice
 def test_site_outside_slope_raster_gives_none_not_zero(tmp_path) -> None:
     slope = tmp_path / "slope.tif"
     _tmp_raster(slope, -89.0, 1.5, 5.0, nodata=-9999.0)
@@ -308,6 +310,7 @@ def test_site_outside_slope_raster_gives_none_not_zero(tmp_path) -> None:
     _assert_slope_unavailable(mh.hazards(far, _TIMES))
 
 
+@needs_spice
 def test_nodata_slope_pixel_gives_none_not_zero(tmp_path) -> None:
     slope = tmp_path / "slope.tif"
     _tmp_raster(slope, -89.0, 1.5, -9999.0, nodata=-9999.0)
@@ -315,6 +318,7 @@ def test_nodata_slope_pixel_gives_none_not_zero(tmp_path) -> None:
     _assert_slope_unavailable(mh.hazards(_SITE, _TIMES))
 
 
+@needs_spice
 def test_valid_slope_has_no_unavailable_entry(tmp_path) -> None:
     slope = tmp_path / "slope.tif"
     _tmp_raster(slope, -89.0, 1.5, 5.0, nodata=-9999.0)
@@ -326,6 +330,7 @@ def test_valid_slope_has_no_unavailable_entry(tmp_path) -> None:
     assert not out["aggregate"].get("unavailable")
 
 
+@needs_spice
 def test_missing_temperature_is_listed_as_unavailable(tmp_path) -> None:
     slope = tmp_path / "slope.tif"
     _tmp_raster(slope, -89.0, 1.5, 5.0, nodata=-9999.0)
@@ -339,6 +344,7 @@ def test_missing_temperature_is_listed_as_unavailable(tmp_path) -> None:
     assert out["hours"][0]["soil_resistance"] is not None  # slope was fine
 
 
+@needs_spice
 def test_missing_psr_map_is_silent_and_harmless(tmp_path) -> None:
     slope = tmp_path / "slope.tif"
     _tmp_raster(slope, -89.0, 1.5, 5.0, nodata=-9999.0)

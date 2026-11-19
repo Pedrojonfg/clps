@@ -12,6 +12,13 @@ from moonpark.hazards.temperature import ClimatologyTable
 from moonpark.providers import Site
 from moonpark.score import score
 
+from pathlib import Path as _Path
+
+_needs_spice = pytest.mark.skipif(
+    not (_Path(__file__).resolve().parents[1] / 'data' / 'kernels' / 'de440s.bsp').is_file(),
+    reason='SPICE kernels not present',
+)
+
 
 def test_quadrant_idw_fills_centre_from_neighbors() -> None:
     g = np.full((5, 5), np.nan)
@@ -44,6 +51,7 @@ def test_climatology_lookup_by_lst_bin() -> None:
     assert k2 == 110.0
 
 
+@_needs_spice
 def test_moon_hazards_returns_hourly_contract() -> None:
     site = Site(lat_deg=-89.0, lon_deg=1.5)
     times = np.array(["2026-07-01T00:00"], dtype="datetime64[h]")
@@ -78,6 +86,7 @@ def test_lst_bin_index_wraps_daily_grid() -> None:
     assert lst_bin_index(23.9) == lst_bin_index(23.9 % 24)
 
 
+@_needs_spice
 def test_local_solar_time_shifts_with_longitude() -> None:
     t = np.datetime64("2026-01-01T00:00")
     lst0 = local_solar_time_h_from_utc(t, 0.0)
@@ -85,6 +94,7 @@ def test_local_solar_time_shifts_with_longitude() -> None:
     assert lst_east == pytest.approx((lst0 + 6.0) % 24.0)
 
 
+@_needs_spice
 def test_polar_pcp_samples_nearest_point(tmp_path) -> None:
     # Synthetic bin around lon=0, lat=-89 (normalized stereo), written for the season and SPICE local-time bin
     # of the request (D-20261118-pj-633d: LST from et2lst; D-20261118-pj-b3dc: no other-season fallback).
