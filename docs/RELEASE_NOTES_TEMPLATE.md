@@ -42,7 +42,7 @@ To try the interface without downloading anything, tick **Mock data (demo)** in 
 
 ## The 3D view
 
-It needs a free [Cesium ion](https://cesium.com/ion/tokens) token (and *Cesium Moon Terrain*, asset 2684829, added to your assets). Without it you get the 2D horizon panorama.
+By default the first-person view builds **our own LOLA relief** (procedural surface, no imagery) from the data store — **no Cesium ion token required**. Ion is optional: add a free [token](https://cesium.com/ion/tokens), add [Cesium Moon Terrain](https://ion.cesium.com/assetdepot/2684829) to your assets, and choose *Use Cesium ion* for the textured higher-resolution backdrop (also the automatic fallback when a site has no relief yet). Without own relief and without a token you get the 2D horizon panorama.
 
 ## Known limitations
 
