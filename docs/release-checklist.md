@@ -6,6 +6,7 @@
 - `scripts/publish_masks.py --dry-run` builds both manifests (cap_1km: 90 files, 879 MB; data: now 416 files / 2737 MB including relief cuts).
 - **2026-11-21 WSL:** AppImage rebuild finished (`moonpark_0.1.0_amd64.AppImage`, also copied to `~/apps/moonpark.AppImage`). Bundled `moonpark-api --port …` returns `/health` ok and mock `/site?mock=1&local_search=1` with a 47-entry leaderboard.
 - **2026-11-21:** fill-stats for D-d90c committed on `feat/recompute-cap-masks` (`scripts/precompute.py`, `cap_index.py`, `tests/test_cap_fill_stats.py`). Full 1 km recompute into `data/masks/cap_1km_new/` is in progress (swap to `cap_1km` when 44/44).
+- **2026-11-21:** real `/site` against local `data/` (kernels + current `cap_1km`) returns `data_source=real` and a feasible score (hazards off).
 
 ## Not verified
 - The UI of the packaged app was not looked at (no screenshot under xvfb); only the engine side was exercised.
