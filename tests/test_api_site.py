@@ -95,6 +95,29 @@ def test_site_real_mask_not_mock_ridge() -> None:
     assert payload["score"]["provenance"]["schedule_version"] == "D-f369-v1"
     assert len(payload["sky"]) == 24
 
+def test_mock_sky_is_south_polar_scale_not_daily_loops() -> None:
+    """Mock Sun/Earth over 24 h should look like polar geometry, not a terrestrial day."""
+    p = client.get("/site?mock=1").json()
+    sky = p["sky"]
+    assert len(sky) == 24
+
+    def circ_span(vals: list[float]) -> float:
+        # Smallest arc covering the samples (mock stays in one sector).
+        xs = sorted(v % 360.0 for v in vals)
+        gaps = [(xs[(i + 1) % len(xs)] - xs[i]) % 360.0 for i in range(len(xs))]
+        return 360.0 - max(gaps)
+
+    sun_az = [s["sun_az_deg"] for s in sky]
+    earth_az = [s["earth_az_deg"] for s in sky]
+    earth_el = [s["earth_el_deg"] for s in sky]
+    sun_el = [s["sun_el_deg"] for s in sky]
+    # Synodic-month circuit ≈ 12.2°/Earth-day; Earth libration chord ≈ 1°/day.
+    assert 10.0 <= circ_span(sun_az) <= 14.0
+    assert circ_span(earth_az) <= 2.0
+    assert max(earth_el) - min(earth_el) <= 1.5
+    assert max(sun_el) < 5.0 and min(sun_el) > -1.0  # stays near the horizon
+
+
 def test_mock_mask_azimuth_convention_reproduces_fractions() -> None:
     # per D-20261116-pj-b43a: the mask read through the stated convention at each Sun azimuth
     # must reproduce the payload's own sun_fraction (this is what every view draws).

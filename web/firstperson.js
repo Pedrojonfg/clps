@@ -103,7 +103,8 @@
   }
 
   function mockSitePayload() {
-    // per D-3832: inline mock shaped like the api mock
+    // per D-3832: inline mock shaped like the API mock (south-polar, one Earth day).
+    // Sun: ~12.2° az / day (synodic month circuit); Earth: ~1° libration drift, not a daily loop.
     const t0 = new Date("2026-06-21T00:00:00Z");
     const mask_elev = [];
     for (let i = 0; i < 720; i++) {
@@ -112,17 +113,23 @@
       if (az > 145 && az < 235) h += 2.8 * Math.exp(-((az - 192) ** 2) / 180);
       mask_elev.push(Math.round(h * 1e4) / 1e4);
     }
+    const sunAz0 = 100.0;
+    const sunEl0 = -0.15;
+    const sunAzPerH = 360.0 / 29.53059 / 24.0; // ≈0.51°/h (~12.2° over 24 h)
+    const sunElPerH = 0.12;
+    const earthAz0 = 24.0;
+    const earthEl0 = 4.1;
+    const earthAzPerH = 1.1 / 23.0;
+    const earthElPerH = -0.85 / 23.0;
     const sky = [];
     for (let hr = 0; hr < 24; hr++) {
       const ts = new Date(t0.getTime() + hr * 3600000);
-      const sun_az = ((hr / 24) * 360 + 12) % 360;
-      const sun_el = -2.4 + 4.8 * Math.max(0, Math.sin(((hr - 6) * 15 * Math.PI) / 180));
       sky.push({
         time_utc: ts.toISOString().replace(".000Z", "Z"),
-        sun_az_deg: Math.round(sun_az * 100) / 100,
-        sun_el_deg: Math.round(sun_el * 1000) / 1000,
-        earth_az_deg: Math.round(((sun_az + 118) % 360) * 100) / 100,
-        earth_el_deg: Math.round((4.5 + 3.2 * Math.sin(((hr * 18 - 40) * Math.PI) / 180)) * 1000) / 1000,
+        sun_az_deg: Math.round(((sunAz0 + sunAzPerH * hr) % 360) * 100) / 100,
+        sun_el_deg: Math.round((sunEl0 + sunElPerH * hr) * 1000) / 1000,
+        earth_az_deg: Math.round((earthAz0 + earthAzPerH * hr) * 100) / 100,
+        earth_el_deg: Math.round((earthEl0 + earthElPerH * hr) * 1000) / 1000,
       });
     }
     return {

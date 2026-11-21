@@ -121,16 +121,28 @@ def _mock_site_payload(local_search: bool = False) -> dict:
         for i in range(720)
     ]
 
+    # South-polar sky over one Earth day (didactic, not a SPICE dump):
+    # - Sun circuits ~360° in one synodic month (~29.53 d) → ~12.2° of azimuth in 24 h;
+    #   elevation stays low. A slow climb through the mask keeps 0 / partial / 1 sun fractions
+    #   for the azimuth-convention test without inventing a daily sunrise.
+    # - Earth hangs near the horizon and only drifts by ~1° (monthly libration chord), not a daily loop.
+    sun_az0, sun_el0 = 100.0, -0.15  # below the ~0.5° mask → sun_fraction 0 at the start
+    sun_az_per_h = (360.0 / 29.53059) / 24.0  # ≈0.51°/h; ~12.2° over the 24 h window
+    sun_el_per_h = 0.12  # climbs to ~2.6°: 0 → partial → full disc (didactic fractions)
+    earth_az0, earth_el0 = 24.0, 4.1
+    earth_az_per_h = 1.1 / 23.0
+    earth_el_per_h = -0.85 / 23.0
+
     sky: list[dict] = []
     for h in range(24):
         ts = t0 + timedelta(hours=h)
         sky.append(
             {
                 "time_utc": ts.isoformat().replace("+00:00", "Z"),
-                "sun_az_deg": round(((h / 24.0) * 360 + 12) % 360, 2),
-                "sun_el_deg": round(1.25 + 0.95 * math.sin(math.radians((h - 3) * 15)), 3),
-                "earth_az_deg": round(20 + 6 * math.sin(math.radians(h * 15)), 2),
-                "earth_el_deg": round(2.2 + 2.0 * math.sin(math.radians(h * 15 - 40)), 3),
+                "sun_az_deg": round((sun_az0 + sun_az_per_h * h) % 360.0, 2),
+                "sun_el_deg": round(sun_el0 + sun_el_per_h * h, 3),
+                "earth_az_deg": round(earth_az0 + earth_az_per_h * h, 2),
+                "earth_el_deg": round(earth_el0 + earth_el_per_h * h, 3),
             }
         )
 
