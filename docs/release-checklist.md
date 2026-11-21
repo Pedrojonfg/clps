@@ -18,5 +18,7 @@
 
 ## Remaining
 1. Finish fill-stats recompute → swap → `publish_masks.py --only cap_1km`.
-2. Push tag `v0.1.0` (draft release with installers); edit notes from `docs/RELEASE_NOTES_TEMPLATE.md`; publish when CI is green.
-3. Optional later: code signing / notarization.
+2. Optional later: code signing / notarization; run Win/mac installers on real machines.
+
+## Released
+- **2026-11-21:** tag `v0.1.0` — CI green ([run](https://github.com/Pedrojonfg/moonpark/actions/runs/44892380278)); GitHub Release published with Linux/Windows/macOS installers.
