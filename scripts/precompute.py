@@ -64,7 +64,7 @@ def tile_key(x_m: float, y_m: float) -> tuple[int, int]:
     return int(math.floor(x_m / TILE_M)), int(math.floor(y_m / TILE_M))
 
 
-def _one_mask(args: tuple[float, float, float, float]) -> tuple[float, float, float, float, float, np.ndarray]:
+def _one_mask(args: tuple[float, float, float, float]) -> tuple[float, float, float, float, float, np.ndarray, dict | None]:
     """Worker: parent must fork after loading G80/G240 (Linux COW)."""
     lat, lon, x, y = args
     assert G80 is not None and G240 is not None and PATH_20 is not None
@@ -79,14 +79,14 @@ def _one_mask(args: tuple[float, float, float, float]) -> tuple[float, float, fl
     ]
     site = Site(lat_deg=lat, lon_deg=lon, observer_height_m=OH)
     h = mask(site, schedule=sched)
-    return lat, lon, x, y, float(h.h0_m), h.elevation_deg.astype(np.float32)
+    return lat, lon, x, y, float(h.h0_m), h.elevation_deg.astype(np.float32), h.fill_stats  # D-d90c
 
 
 def write_tile(
     out_dir: Path,
     tx: int,
     ty: int,
-    rows: list[tuple[float, float, float, float, float, np.ndarray]],
+    rows: list[tuple[float, float, float, float, float, np.ndarray, dict | None]],
 ) -> Path:
     tile_dir = out_dir / "tiles"
     tile_dir.mkdir(parents=True, exist_ok=True)
@@ -101,7 +101,7 @@ def write_tile(
         "observer_height_m": OH,
         "schedule_version": SCHEDULE_VERSION,
         "sites": [
-            {"lat": r[0], "lon": r[1], "x_m": r[2], "y_m": r[3], "h0_m": r[4], "row": i}
+            {"lat": r[0], "lon": r[1], "x_m": r[2], "y_m": r[3], "h0_m": r[4], "row": i, "fill": r[6]}
             for i, r in enumerate(rows)
         ],
     }
