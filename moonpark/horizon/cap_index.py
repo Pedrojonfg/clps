@@ -165,4 +165,5 @@ def mask_from_cap_tile(tile_x: int, tile_y: int, row: int) -> HorizonMask:
         observer_height_m=float(meta.get("observer_height_m", 2.0)),
         schedule_version=str(meta.get("schedule_version", SCHEDULE_VERSION)),
         dem_ids=tuple(),
+        fill_stats=s.get("fill"),  # absent in tiles written before D-d90c
     )
